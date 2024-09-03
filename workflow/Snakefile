@@ -1,0 +1,109 @@
+include: Path("rules/common.smk")
+
+rule all:
+    input:
+        output_files
+    
+
+rule split_files:
+    input:
+        loom_file_list,
+    output:
+        [(output_folder / f'{file.stem}_split1.loom', output_folder / f'{file.stem}_split2.loom') for file in loom_file_list],
+    params:
+        seed = 42,
+        output_dir = output_folder
+    conda:
+        "envs/loom.yml"
+    log:
+        output_folder / 'log' / 'split_files.log',
+    shell:
+        """
+        python {workflow.basedir}/scripts/split_loom_files.py --input {input} --seed {params.seed} --alpha 3 --output_dir {params.output_dir} \
+        &> {log}
+        """
+
+
+rule create_demultiplexing_scheme:
+    input:
+        [(output_folder / f'{file.stem}_split1.loom', output_folder / f'{file.stem}_split2.loom') for file in loom_file_list]
+    output:
+        output_folder / "pools.txt"
+    params:
+        maximal_pool_size = 4,
+        number_of_samples = 10,
+        robust = False,
+    log:
+        output_folder / 'log' / 'create_demultiplexing_scheme.log'
+    shell:
+        """
+        python {workflow.basedir}/scripts/create_demultiplexing_scheme.py --robust {params.robust} --maximal_pool_size {params.maximal_pool_size} --n_samples {params.number_of_samples} --output {output} \
+        &> {log}
+        """
+
+rule pooling:
+    input:
+        pool_data = output_folder / "pools.txt",
+    output:
+        output_folder / 'pools' / "pool_{pool_ID}.csv"
+    params:
+        minGQ=config.get("mosaic", {}).get("minGQ", 30),
+        minDP=config.get("mosaic", {}).get("minDP", 10),
+        minVAF=config.get("mosaic", {}).get("minVAF", 0.2),
+        minVarGeno=config.get("mosaic", {}).get("minVarGeno", 0.5),
+        minCellGeno=config.get("mosaic", {}).get("minCellGeno", 0.5),
+        minMutated=config.get("mosaic", {}).get("minMutated", 0.05),  # default: 0.01
+        maxRefVAF=config.get("mosaic", {}).get("maxRefVAF", 0.05),
+        minHomVAF=config.get("mosaic", {}).get("minHomVAF", 0.95),
+        minHetVAF=config.get("mosaic", {}).get("minHetVAF", 0.35),
+        proximity=config.get("mosaic", {}).get("proximity", "25 50 100 200"),
+        samples = lambda w, input: yaml.safe_load(
+            open(input.pool_data,'r')
+            )[w.pool_ID],
+    log:
+        output_folder / 'log' / 'pooling_{pool_ID}.log'
+    shell:
+        """
+        python {workflow.basedir}/scripts/mosaic_processing.py
+            --input {params.samples}
+            -o {output} \
+            --minGQ {params.minGQ} \
+            --minDP {params.minDP} \
+            --minVAF {params.minVAF} \
+            --minVarGeno {params.minVarGeno} \
+            --minCellGeno {params.minCellGeno} \
+            --minMutated {params.minMutated} \
+            --max_ref_VAF {params.maxRefVAF} \
+            --min_hom_VAF {params.minHomVAF} \
+            --min_het_VAF {params.minHetVAF} \
+            --proximity {params.proximity} \
+            --full_output \
+            &> {log}
+        """
+
+
+rule demultiplexing_demoTape:
+        input:
+            variants = output_folder / 'pools' / 'pool_{pool_ID}.csv',
+            pool_data = output_folder / "pools.txt"
+        output:
+            output_folder / 'demultiplexed' / '{pool_ID}.filtered_variants.assignments.tsv',
+        resources:
+            mem_mb=4096,
+            runtime=90,
+        conda:
+            "../envs/sample_assignment.yml"
+        log:
+            output_folder / 'log' / 'demultiplexing_{pool_ID}.log',
+        params:
+            cluster_number= lambda w, input: len(
+                yaml.safe_load(open(input.pool_data, 'r'))[pool_ID]
+            )
+        shell:
+            """
+            python {workflow.basedir}/scripts/demultiplex_distance.py \
+                -i {input} \
+                -n {params.cluster_number} \
+                --output_plot \
+            &> {log}
+            """
