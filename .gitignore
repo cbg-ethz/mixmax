@@ -1,2 +1,6 @@
 .snakemake
 slurm*
+.vscode
+tests
+!tests/test_*.py
+*__pycache__

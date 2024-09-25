@@ -1,4 +1,4 @@
-#executor: slurm
+executor: slurm
 latency-wait: 60
 jobs: 500
 #default-storage-provider: fs

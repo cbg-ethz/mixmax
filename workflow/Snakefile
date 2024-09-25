@@ -7,26 +7,29 @@ rule all:
 
 rule split_files:
     input:
-        loom_file_list,
+        loom_files / '{loom_file}.loom',
     output:
-        [(output_folder / f'{file.stem}_split1.loom', output_folder / f'{file.stem}_split2.loom') for file in loom_file_list],
+        output_folder / 'temp' / '{loom_file}_split1.loom',
+        output_folder / 'temp' / '{loom_file}_split2.loom',
     params:
-        seed = 42,
         output_dir = output_folder
     conda:
         "envs/loom.yml"
+    resources:
+        mem_mb=400000,
+        runtime=90,
     log:
-        output_folder / 'log' / 'split_files.log',
+        output_folder / 'log' / 'split_{loom_file}.log',
     shell:
         """
-        python {workflow.basedir}/scripts/split_loom_files.py --input {input} --seed {params.seed} --alpha 3 --output_dir {params.output_dir} \
+        python {workflow.basedir}/scripts/split_loom_files.py --input {input} --alpha 3 --output_dir {params.output_dir} \
         &> {log}
         """
 
 
 rule create_demultiplexing_scheme:
     input:
-        [(output_folder / f'{file.stem}_split1.loom', output_folder / f'{file.stem}_split2.loom') for file in loom_file_list]
+        [(output_folder / 'temp' / f'{file.stem}_split1.loom', output_folder / 'temp' / f'{file.stem}_split2.loom') for file in loom_file_list]
     output:
         output_folder / "pools.txt"
     params:
