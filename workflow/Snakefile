@@ -5,50 +5,83 @@ rule all:
         output_files
     
 
-rule split_files:
-    input:
-        loom_files / '{loom_file}.loom',
+checkpoint get_input_samples:
     output:
-        output_folder / 'temp' / '{loom_file}_split1.loom',
-        output_folder / 'temp' / '{loom_file}_split2.loom',
+        samples_file = output_folder / "seed_{seed}" / "sample_list_{seed}.txt"
     params:
-        output_dir = output_folder
+        number_of_samples = number_of_samples,
+        loom_file_path = loom_file_path,
+        seed = lambda w: w.seed,
+    log:
+        output_folder / 'log' / 'generate_input_samples_{seed}.log'
+    shell:
+        """
+        python {workflow.basedir}/scripts/get_input_samples.py \
+        --number_of_samples {params.number_of_samples} \
+        --loom_file_path {params.loom_file_path} \
+        --output {output} \
+        --seed {params.seed} \
+        &> {log}
+        """
+
+rule split_files: ### This part of the pipeline is still not fully reproducible, because the files are split randomly. If I use the seed though, every file will be split the same way, which is not what I want.
+    input:
+        loom_file_path / '{loom_file}.loom',
+    output:
+        split1 = output_folder / "seed_{seed}" / "loom" / '{loom_file}_split1.loom',
+        split2 = output_folder / "seed_{seed}" / "loom" / '{loom_file}_split2.loom',
     conda:
         "envs/loom.yml"
     resources:
-        mem_mb=400000,
+        mem_mb=3000,
         runtime=90,
     log:
-        output_folder / 'log' / 'split_{loom_file}.log',
+        output_folder / "seed_{seed}" / 'log' / 'split_{loom_file}.log',
     shell:
         """
-        python {workflow.basedir}/scripts/split_loom_files.py --input {input} --alpha 3 --output_dir {params.output_dir} \
+        python {workflow.basedir}/scripts/split_loom_files.py \
+         --input {input} \
+        --alpha 6 \
+        --output {output.split1} \
         &> {log}
         """
 
 
-rule create_demultiplexing_scheme:
+checkpoint create_demultiplexing_scheme:
     input:
-        [(output_folder / 'temp' / f'{file.stem}_split1.loom', output_folder / 'temp' / f'{file.stem}_split2.loom') for file in loom_file_list]
+        sample_file = output_folder / "seed_{seed}" / 'sample_list_{seed}.txt'
     output:
-        output_folder / "pools.txt"
+        pools = output_folder / "seed_{seed}" / "pools_{seed}.txt"
     params:
-        maximal_pool_size = 4,
-        number_of_samples = 10,
+        maximal_pool_size = config["max_pool_size"],
+        number_of_samples = number_of_samples,
         robust = False,
+        input_dir = lambda w: output_folder / f"seed_{w.seed}" / "loom"
     log:
-        output_folder / 'log' / 'create_demultiplexing_scheme.log'
+        output_folder / "seed_{seed}" /  'log' / 'create_demultiplexing_scheme_{seed}.log'
     shell:
         """
-        python {workflow.basedir}/scripts/create_demultiplexing_scheme.py --robust {params.robust} --maximal_pool_size {params.maximal_pool_size} --n_samples {params.number_of_samples} --output {output} \
+        python {workflow.basedir}/scripts/create_demultiplexing_scheme.py \
+        --robust {params.robust} \
+        --maximal_pool_size {params.maximal_pool_size} \
+        --n_samples {params.number_of_samples} \
+        --output {output} \
+        --input_sample_file {input.sample_file} \
+        --input_dir {params.input_dir} \
         &> {log}
         """
 
-rule pooling:
+
+rule pooling: ##Need to introduce proper downsampling of cells
     input:
-        pool_data = output_folder / "pools.txt",
+        split_files = lambda w: yaml.safe_load(
+            open(
+                checkpoints.create_demultiplexing_scheme.get(seed=w.seed).output.pools
+                )
+            )[f"({w.pool_ID})"],
+        pool_data = output_folder / "seed_{seed}" / "pools_{seed}.txt",
     output:
-        output_folder / 'pools' / "pool_{pool_ID}.csv"
+        output_folder / "seed_{seed}" / "pools" / "pool_{pool_ID}_{seed}.csv"
     params:
         minGQ=config.get("mosaic", {}).get("minGQ", 30),
         minDP=config.get("mosaic", {}).get("minDP", 10),
@@ -60,15 +93,20 @@ rule pooling:
         minHomVAF=config.get("mosaic", {}).get("minHomVAF", 0.95),
         minHetVAF=config.get("mosaic", {}).get("minHetVAF", 0.35),
         proximity=config.get("mosaic", {}).get("proximity", "25 50 100 200"),
-        samples = lambda w, input: yaml.safe_load(
-            open(input.pool_data,'r')
-            )[w.pool_ID],
+        ratios = lambda w, input: sample_mixing_ratios(w.seed, len(input.split_files)),
+        doublet_rate = config["doublet_rate"],
+        cell_number = config["downsampling"],
+    resources:
+        mem_mb=1000000,
+        runtime=90,
+    conda:
+        "envs/mosaic.yml"
     log:
-        output_folder / 'log' / 'pooling_{pool_ID}.log'
+        output_folder / "seed_{seed}" / 'log' / 'pooling_{pool_ID}_{seed}.log'
     shell:
         """
-        python {workflow.basedir}/scripts/mosaic_processing.py
-            --input {params.samples}
+        python {workflow.basedir}/scripts/mosaic_processing.py \
+            --input {input.split_files} \
             -o {output} \
             --minGQ {params.minGQ} \
             --minDP {params.minDP} \
@@ -81,32 +119,41 @@ rule pooling:
             --min_het_VAF {params.minHetVAF} \
             --proximity {params.proximity} \
             --full_output \
+            --ratio {params.ratios} \
+            --doublets {params.doublet_rate} \
+            --cell_no {params.cell_number} \
             &> {log}
         """
 
 
 rule demultiplexing_demoTape:
         input:
-            variants = output_folder / 'pools' / 'pool_{pool_ID}.csv',
-            pool_data = output_folder / "pools.txt"
+            variants = output_folder /  "seed_{seed}" / "pools" / "pool_{pool_ID}_{seed}.csv",
+            pools = output_folder / "seed_{seed}" / "pools_{seed}.txt",
         output:
-            output_folder / 'demultiplexed' / '{pool_ID}.filtered_variants.assignments.tsv',
+            output_folder / "seed_{seed}" / 'demultiplexed' / 'pool_{pool_ID}_{seed}_demultiplexed.profiles.tsv',
         resources:
             mem_mb=4096,
             runtime=90,
         conda:
-            "../envs/sample_assignment.yml"
+            "envs/sample_assignment.yml"
         log:
-            output_folder / 'log' / 'demultiplexing_{pool_ID}.log',
+            output_folder / 'log' / 'demultiplexing_{pool_ID}_{seed}.log',
         params:
-            cluster_number= lambda w, input: len(
-                yaml.safe_load(open(input.pool_data, 'r'))[pool_ID]
-            )
+            cluster_number= lambda w, input:determine_number_of_different_donors(
+                checkpoints.create_demultiplexing_scheme.get(seed=w.seed).output.pools,
+                "({})".format(w.pool_ID)
+                ),
+            outbase = lambda w: output_folder / "seed_{}".format(w.seed) / 'demultiplexed' / "pool_{}_{}_demultiplexed".format(w.pool_ID, w.seed)
         shell:
             """
-            python {workflow.basedir}/scripts/demultiplex_distance.py \
-                -i {input} \
+            python {workflow.basedir}/scripts/demo_tape.py \
+                --input {input.variants} \
                 -n {params.cluster_number} \
-                --output_plot \
+                --output {params.outbase} \
             &> {log}
-            """
+           """
+
+#rule create_distance_matrix:
+#    input: 
+#        lambda w: get_demultiplexed_samples(output_folder / "seed_{}".format(seed=w.seed) / "pools_{}.txt".format(seed=w.seed)),

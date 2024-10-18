@@ -1,9 +1,12 @@
 import unittest
 from pathlib import Path
 import importlib.util
+import logging
 
 import numpy as np
 import loompy
+
+logging.basicConfig(format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M",level=logging.DEBUG)
 
 script_directory = Path(__file__).resolve().parent
 
@@ -18,11 +21,11 @@ class TestSplitLoomFiles(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(TestSplitLoomFiles, self).__init__(*args, **kwargs)
         self.filename = "split_loom_data_test.loom"
-        matrix = np.arange(4).reshape(2,2)
-        row_attrs = { "SomeRowAttr": np.arange(2), "OtherRowAttr": ['A','B'] }
-        col_attrs = { "SomeColAttr": np.arange(2), "OtherColAttr": ['C','D'] }
-        other_layer = np.arange(4, 8).reshape(2,2)
-        loompy.create((script_directory / self.filename).as_posix(), layers = {"":matrix, "other": other_layer}, row_attrs = row_attrs, col_attrs = col_attrs)
+        #matrix = np.arange(4).reshape(2,2)
+        #row_attrs = { "SomeRowAttr": np.arange(2), "OtherRowAttr": ['A','B'] }
+        #col_attrs = { "SomeColAttr": np.arange(2), "OtherColAttr": ['C','D'] }
+        #other_layer = np.arange(4, 8).reshape(2,2)
+        #loompy.create((script_directory / self.filename).as_posix(), layers = {"":matrix, "other": other_layer}, row_attrs = row_attrs, col_attrs = col_attrs)
 
     def test_split_loom_files(self):
         loom_file = script_directory / self.filename

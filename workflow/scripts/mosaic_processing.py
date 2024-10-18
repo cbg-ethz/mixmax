@@ -11,12 +11,17 @@ import re
 import shutil
 import tempfile
 import logging
+from pathlib import Path
+import itertools
 
 
 import loompy
 import numpy as np
 import pandas as pd
 
+from memory_profiler import profile
+
+logging.basicConfig(format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M",level=logging.DEBUG)
 
 EPSILON = np.finfo(np.float64).resolution
 
@@ -390,6 +395,20 @@ def merge_gt(gt_in):
         return 1
 
 
+def subsample_cells(no_cells, ratios, total_cell_count = np.inf):
+    if not isinstance(ratios, np.ndarray):
+        raise TypeError("Ratios need to be a numpy array!")
+    smallest_sample = np.argmin(no_cells)
+    if total_cell_count < np.inf:
+        samples_total = (args.cell_no * ratios).astype(int)
+    else:
+        samples_total = (no_cells.min() * ratios/ratios[smallest_sample]).astype(int)
+    for i,size in enumerate(samples_total):
+        samples_total[i] = min(size, no_cells[i])
+
+    return samples_total
+
+@profile
 def multiplex_looms(args):
     no_samples = len(args.input)
     assert no_samples == len(args.ratio), (
@@ -404,23 +423,25 @@ def multiplex_looms(args):
             temp_in_file = os.path.join(temp_dir, os.path.basename(in_file))
             shutil.copy2(in_file, temp_in_file)
             with loompy.connect(temp_in_file) as ds:
-                no_cells[i] = ds.col_attrs['barcode'].size
+                no_cells[i] = ds.shape[1]
 
-    # Subsample cells
-    samples_total = (no_cells.min() * np.array(args.ratio)).astype(int)
-    dbt_total = int(samples_total.sum() * args.doublets)
-    samples_size = samples_total + (dbt_total * np.array(args.ratio)).astype(int)
 
+    samples_size = subsample_cells(no_cells, np.array(args.ratio), args.cell_no)
+    
     samples = {}
     for i, size in enumerate(samples_size):
+        size = min(size, no_cells[i])
         cells_multiplex = np.random.choice(no_cells[i], size=size, replace=False)
         samples[i] = {'idx': np.sort(cells_multiplex)}
 
     for i, in_file in enumerate(args.input):
+
         print(f'Reading: {in_file}')
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_in_file = os.path.join(temp_dir, os.path.basename(in_file))
             shutil.copy2(in_file, temp_in_file)
+
+
 
             # Open loom file and read data
             with loompy.connect(temp_in_file) as ds:
@@ -428,7 +449,6 @@ def multiplex_looms(args):
                     [ds.ra['CHROM'], ds.ra['POS'], ds.ra['REF'], ds.ra['ALT']]
                 )
                 cols = samples[i]['idx'] + ((i + 1) / 10)
-
                 df_new = pd.DataFrame(
                     ds[:, samples[i]['idx']], index=index, columns=cols
                 )
@@ -446,11 +466,26 @@ def multiplex_looms(args):
                     ds.layers['RO'][:, samples[i]['idx']], index=index, columns=cols
                 )
 
-                barcodes = np.char.add(
-                    ds.col_attrs['barcode'][samples[i]['idx']], f'.pat{i:.0f}'
-                )
-                barcode_length = int(barcodes.dtype.str[2:])
-                samples[i]['name'] = barcodes.astype(f'<U{2*barcode_length+1}')
+
+                try:
+                    barcodes = np.char.add(
+                        ds.col_attrs['barcode'][samples[i]['idx']], f'.pat{i:.0f}'
+                    )
+                    barcode_length = int(barcodes.dtype.str[2:])
+                    samples[i]['name'] = barcodes.astype(f'<U{2*barcode_length+1}')
+                except (AttributeError, TypeError) as error:
+                    logging.error(error)
+                    logging.error("No barcode information found in loom file. Continuing with generic cell names.")
+
+                    in_file_stripped = str(Path(in_file).stem)
+                    match = re.search(r'_split([12])$', in_file_stripped)
+                    in_file_stripped = re.sub(r'_split[12]$', '', in_file_stripped)
+                    if not match:
+                        raise ValueError("The file names must end with '_split1' or '_split2'.")
+                    split_number = match.group(1)
+                    matched_pattern = f'split{split_number}'
+                    samples[i]['name'] = [f"{x+1}_{in_file_stripped}.{matched_pattern}" for x in range(samples[i]['idx'].size)]
+
 
         # First sample, nothing to merge
         if i == 0:
@@ -478,20 +513,24 @@ def multiplex_looms(args):
     del RO_new
     gc.collect()
 
+
     # Add doublets (if doublets arg specified)
     print('Generating doublets')
     samples['dbt'] = {'name': []}
-    s_probs = np.array(args.ratio) / sum(args.ratio)
 
+    s_probs = samples_size/np.sum(samples_size)
     drop_cells = []
     dbt_gt = {}
     dbt_DP = {}
     dbt_GQ = {}
     dbt_AD = {}
     dbt_RO = {}
+
+    dbt_total = int(args.doublets * np.sum(samples_size))
     for i in range(dbt_total):
         s1, s2 = np.random.choice(no_samples, size=2, replace=False, p=s_probs)
-
+        logging.info("Sample 1: %s, Sample 2: %s", s1, s2)
+        logging.info("Sample 1: %s, Sample 2: %s", samples[s1]['idx'].size, samples[s2]['idx'].size)
         c1_idx = np.random.choice(samples[s1]['idx'].size)
         c2_idx = np.random.choice(samples[s2]['idx'].size)
 
@@ -499,7 +538,9 @@ def multiplex_looms(args):
         c2 = samples[s2]['idx'][c2_idx] + ((s2 + 1) / 10)
 
         new_id = f'{c1}+{c2}'
-        new_name = f'{samples[s1]["name"][c1_idx]}+{samples[s2]["name"][c2_idx]}'
+        new_name_sample1 = samples[s1]["name"][c1_idx]
+        new_name_sample2 = samples[s2]["name"][c2_idx]
+        new_name = f'{new_name_sample1}+{new_name_sample2}'
 
         dbt_gt[new_id] = np.apply_along_axis(merge_gt, axis=1, arr=df[[c1, c2]])
         dbt_GQ[new_id] = GQ[[c1, c2]].mean(axis=1)
@@ -605,15 +646,41 @@ def multiplex_looms(args):
     }
 
     for row, var_data in enumerate(gt):
+        cell_data = np.empty((len(variants_info['CHR']), len(cells)), dtype=object)
+        for row, var_data in enumerate(gt):
+            for col, cell in enumerate(cells):
+                cell_data[row, col] = f'{RO[row, col]}:{AD[row, col]}:{var_data[col]}'
+
         for col, cell in enumerate(cells):
             name = cell_names[col]
-            cell_str = f'{RO[row, col]}:{AD[row, col]}:{var_data[col]}'
-            try:
-                variants_info[name].append(cell_str)
-            except KeyError:
-                variants_info[name] = [cell_str]
-
+            variants_info[name] = cell_data[:, col].tolist()
+    
     return pd.DataFrame(variants_info), gt, VAF
+
+
+
+
+"""
+                for (ix, selection, view) in ds.scan(items=samples[i]['idx'], axis=1):
+                    cols = selection + ((i + 1) / 10)
+                    logging.info(selection)
+                    if 'df_new' not in locals():
+                        df_new = pd.DataFrame(view[:, :], index=index, columns=cols)
+                        ampl_new = pd.Series(view.ra['amplicon'], index=index, name=0)
+                        DP_new = pd.DataFrame(view.layers['DP'][:, :], index=index, columns=cols)
+                        GQ_new = pd.DataFrame(view.layers['GQ'][:, :], index=index, columns=cols)
+                        AD_new = pd.DataFrame(view.layers['AD'][:, :], index=index, columns=cols)
+                        RO_new = pd.DataFrame(view.layers['RO'][:, :], index=index, columns=cols)
+                    else:
+                        df_new = df_new.join(pd.DataFrame(view[:, :], index=index, columns=cols))
+                        ampl_new = ampl_new.combine_first(pd.Series(view.ra['amplicon'], index=index, name=0))
+                        DP_new = DP_new.join(pd.DataFrame(view.layers['DP'][:, :], index=index, columns=cols))
+                        GQ_new = GQ_new.join(pd.DataFrame(view.layers['GQ'][:, :], index=index, columns=cols))
+                        AD_new = AD_new.join(pd.DataFrame(view.layers['AD'][:, :], index=index, columns=cols))
+                        RO_new = RO_new.join(pd.DataFrame(view.layers['RO'][:, :], index=index, columns=cols))
+"""
+
+
 
 
 def compute_pseudobulk_VAFs(df1, gt1):
@@ -827,7 +894,9 @@ def parse_args():
 
 
 if __name__ == '__main__':
+    logging.info("Parsing arguments.")
     args = parse_args()
     if args.whitelist:
         update_whitelist(args.whitelist)
+    logging.info("Running main program.")
     main(args)

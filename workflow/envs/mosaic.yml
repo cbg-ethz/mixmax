@@ -1,0 +1,7 @@
+channels:
+  - conda-forge
+dependencies:
+  - h5py 
+  - numpy<2.0
+  - pandas
+  - loompy 
