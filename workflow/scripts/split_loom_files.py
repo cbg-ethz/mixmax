@@ -6,6 +6,8 @@ from itertools import islice
 import h5py
 from typing import Optional, Dict
 import os
+import shutil
+import tempfile
 
 
 import loompy
@@ -111,34 +113,39 @@ def split_loom_file(splitting_ratio, loom_file, output_dir, seed = None):
     else:
         rng = np.random.default_rng()
 
-    with loompy.connect(loom_file) as ds:
-        n_cells = ds.shape[1]
-        split_vector = rng.choice([0,1], size=n_cells, p=[1-splitting_ratio, splitting_ratio])
-        
-        indices_first_sample = np.where(split_vector == 1)[0]
-        indices_second_sample = np.where(split_vector == 0)[0]
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_loom_file = Path(temp_dir) / Path(loom_file).name
+        shutil.copy2(loom_file, temp_loom_file)
+            
 
-        loom_file = Path(loom_file)
-        ds_view = loompy.ViewManager(ds)
-        output_1 = (output_dir / f'{loom_file.stem}_split1.loom').as_posix()
+        with loompy.connect(temp_loom_file) as ds:
+            n_cells = ds.shape[1]
+            split_vector = rng.choice([0,1], size=n_cells, p=[1-splitting_ratio, splitting_ratio])
+            
+            indices_first_sample = np.where(split_vector == 1)[0]
+            indices_second_sample = np.where(split_vector == 0)[0]
 
-        with fancy_loompy_new(output_1) as ds1:
-            logging.info(f"Connection to {output_1} established")
-            ds1.add_columns_batched(ds_view, indices_first_sample, batch_size = 30)
-            number_of_cells1 = ds1.shape[1]
-        logging.info("Writing file 1 was successful!")
+            loom_file = Path(loom_file)
+            ds_view = loompy.ViewManager(ds)
+            output_1 = (output_dir / f'{loom_file.stem}_split1.loom').as_posix()
 
-        output_2 = (output_dir / f'{loom_file.stem}_split2.loom').as_posix()
-        with fancy_loompy_new(output_2) as ds2:
-            logging.info(f"Connection to {output_2} established")
-            ds2.add_columns_batched(ds_view, indices_second_sample, batch_size = 30)
-            number_of_cells2 = ds2.shape[1]
-        logging.info("Writing file 2 was successful!")
-        if number_of_cells1 + number_of_cells2 == n_cells:
-            logging.info("Splitting was successful!")
-        else:
-            logging.error("The number of cells in the split files does not match the number of cells in the original file")
-            raise ValueError(f"Split 1 has {number_of_cells1} cells and split 2 has {number_of_cells2} cells, but the original file has {n_cells} cells")
+            with fancy_loompy_new(output_1) as ds1:
+                logging.info(f"Connection to {output_1} established")
+                ds1.add_columns_batched(ds_view, indices_first_sample, batch_size = 30)
+                number_of_cells1 = ds1.shape[1]
+            logging.info("Writing file 1 was successful!")
+
+            output_2 = (output_dir / f'{loom_file.stem}_split2.loom').as_posix()
+            with fancy_loompy_new(output_2) as ds2:
+                logging.info(f"Connection to {output_2} established")
+                ds2.add_columns_batched(ds_view, indices_second_sample, batch_size = 30)
+                number_of_cells2 = ds2.shape[1]
+            logging.info("Writing file 2 was successful!")
+            if number_of_cells1 + number_of_cells2 == n_cells:
+                logging.info("Splitting was successful!")
+            else:
+                logging.error("The number of cells in the split files does not match the number of cells in the original file")
+                raise ValueError(f"Split 1 has {number_of_cells1} cells and split 2 has {number_of_cells2} cells, but the original file has {n_cells} cells")
     return None
 
 

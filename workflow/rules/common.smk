@@ -43,7 +43,7 @@ def get_split_files(path):
 
 
 def sample_mixing_ratios(seed, max_pool_size):
-    concentrations = [20/max_pool_size] * max_pool_size
+    concentrations = [40/max_pool_size] * max_pool_size
     rng = np.random.default_rng(seed=int(seed))
     ratios = rng.dirichlet(concentrations)
     
@@ -66,14 +66,8 @@ def determine_number_of_different_donors(pool_file, pool_ID):
             elif "_split2" in sample.stem:
                 unique_patterns.add(sample.stem.replace("_split2", ""))
                 
-    return len(unique_patterns)
+    return len(unique_patterns)+1
 
-#output_files = [output_folder / f"seed_{seed}" / 'pools' / 'pool_0.0_123.csv', output_folder / f"seed_{seed}" / 'pools' / 'pool_1.0_123.csv', output_folder / f"seed_{seed}" / 'pools' / 'pool_2.0_123.csv', output_folder / f"seed_{seed}" / 'pools' / 'pool_3.0_123.csv']
-
-
-#for file in loom_files:
-#    output_files.append(output_folder / 'temp' / f'{file.stem}_split1.loom')
-#    output_files.append(output_folder / 'temp' / f'{file.stem}_split2.loom')
     
 if number_of_samples > len(loom_files):
     logging.error(f"Number of samples ({number_of_samples}) is greater than the number of loom files ({len(loom_files)}). Continuing with maximal number of samples.")
@@ -85,4 +79,5 @@ else:
 input_samples = generate_input_samples(loom_files, number_of_samples)
 
 #output_files.append(output_folder / f"seed_{seed}" / f"pools_{seed}.txt")
-output_files = [output_folder / f"seed_{seed}" / "demultiplexed" / f"pool_{pool_ID}_{seed}_demultiplexed.profiles.tsv" for pool_ID in ["0.0", "1.0", "2.0", "3.0"]]
+output_files = [output_folder / f"seed_{seed}" / "demultiplexed" / f"pool_{pool_ID}_{seed}_ground_truth_assignment.tsv" for pool_ID in ["0.0", "1.0", "2.0", "3.0"]]
+output_files

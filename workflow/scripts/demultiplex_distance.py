@@ -169,8 +169,12 @@ class demoTape:
 
     def demultiplex(self):
         self.init_dendrogram()
-        self.identify_doublets()
-        self.merge_surplus_singlets()
+        #self.identify_doublets()
+        self.set_assignment(self.sgt_cl_no)
+        self.sgt_ids = np.array(
+            [i for i in np.unique(self.assignment)]
+        )
+        #self.merge_surplus_singlets()
 
     # -------------------------------- DENDROGRAM ----------------------------------
 
@@ -273,7 +277,7 @@ class demoTape:
 
     def get_cl_map(self):
         if self.sgt_ids.size == 0:
-            cl_map = {i: i for i in np.unique(self.assignment)}
+            cl_map = {i: str(i) for i in np.unique(self.assignment)}
             assignment_str = [str(i) for i in self.assignment]
         else:
             # Rename clusters to range from 0 to n
@@ -509,9 +513,9 @@ class demoTape:
 
     # -------------------------- GENERATE OUTPUT -------------------------------
 
-    def safe_results(self, output):
+    def save_results(self, output):
         self.print_summary()
-        self.safe_profiles(output)
+        self.save_profiles(output)
         # Print assignment to tsv file
         _, assignment_str = self.get_cl_map()
         cell_str = '\t'.join([i for i in self.cells])
@@ -520,7 +524,7 @@ class demoTape:
         with open(f'{output}.assignments.tsv', 'w') as f:
             f.write(f'Barcode\t{cell_str}\nCluster\t{cl_str}\nOrder\t{order_str}')
 
-    def safe_profiles(self, output):
+    def save_profiles(self, output):
         pass
 
     def print_summary(self):
@@ -748,8 +752,8 @@ class demoTape_reads(demoTape):
     def apply_cm_specifics(cm):
         pass
 
-    def safe_profiles(self, output):
-        # Safe SNV profiles to identy patients
+    def save_profiles(self, output):
+        # Save SNV profiles to identy patients
         cl_map, _ = self.get_cl_map()
         VAF_df = self.get_VAF_profile(self.sgt_ids)
         VAF_df.index = [
@@ -908,8 +912,8 @@ class demoTape_gt(demoTape):
         colorbar = cm.ax_heatmap.collections[0].colorbar
         colorbar.set_ticklabels([r' $-$', '0|0', '0|1', '1|1'])
 
-    def safe_profiles(self, output):
-        # Safe SNV profiles to identy patients
+    def save_profiles(self, output):
+        # Save SNV profiles to identy patients
         cl_map, _ = self.get_cl_map()
         idx = [f'{cl_map[i]} ({COLORS_STR[int(cl_map[i])]})' for i in self.sgt_ids]
         pd.DataFrame(self.profiles[self.sgt_ids], index=idx, columns=self.SNPs).round(
@@ -964,7 +968,7 @@ def main(args):
         if not args.output:
             args.output = os.path.splitext(in_file)[0]
 
-        dt.safe_results(args.output)
+        dt.save_results(args.output)
         if args.output_plot:
             dt.plot_heatmap(f'{args.output}.heatmap.{FILE_EXT}')
         if args.show_plot:

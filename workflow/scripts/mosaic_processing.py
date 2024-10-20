@@ -12,14 +12,12 @@ import shutil
 import tempfile
 import logging
 from pathlib import Path
-import itertools
 
 
 import loompy
 import numpy as np
 import pandas as pd
 
-from memory_profiler import profile
 
 logging.basicConfig(format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M",level=logging.DEBUG)
 
@@ -101,9 +99,11 @@ def main(args):
         logging.warning(
             "Computation of the VAFs based on all cells' genotype call at a position. There is no correction of the VAFs for tumor purity and ploidy."
         )
+        
+        """ 
         logging.error(
             'Unexpected behaviour in the computation of variant allele frequencies. Values may exceed 1.'
-        )
+        ) """
         if args.panel:
             df1 = adapt_variant_naming(df1, args)
         else:
@@ -408,7 +408,7 @@ def subsample_cells(no_cells, ratios, total_cell_count = np.inf):
 
     return samples_total
 
-@profile
+
 def multiplex_looms(args):
     no_samples = len(args.input)
     assert no_samples == len(args.ratio), (
@@ -418,36 +418,30 @@ def multiplex_looms(args):
     assert np.sum(args.ratio) <= 1, 'Ratios cannot sum up to >1.'
 
     no_cells = np.zeros(no_samples, dtype=int)
-    for i, in_file in enumerate(args.input):
-        with tempfile.TemporaryDirectory() as temp_dir:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        for i, in_file in enumerate(args.input):
             temp_in_file = os.path.join(temp_dir, os.path.basename(in_file))
             shutil.copy2(in_file, temp_in_file)
             with loompy.connect(temp_in_file) as ds:
                 no_cells[i] = ds.shape[1]
-
-
-    samples_size = subsample_cells(no_cells, np.array(args.ratio), args.cell_no)
     
-    samples = {}
-    for i, size in enumerate(samples_size):
-        size = min(size, no_cells[i])
-        cells_multiplex = np.random.choice(no_cells[i], size=size, replace=False)
-        samples[i] = {'idx': np.sort(cells_multiplex)}
+        samples_size = subsample_cells(no_cells, np.array(args.ratio), args.cell_no)
+    
+        samples = {}
+        for i, size in enumerate(samples_size):
+            size = min(size, no_cells[i])
+            cells_multiplex = np.random.choice(no_cells[i], size=size, replace=False)
+            samples[i] = {'idx': np.sort(cells_multiplex)}
 
-    for i, in_file in enumerate(args.input):
-
-        print(f'Reading: {in_file}')
-        with tempfile.TemporaryDirectory() as temp_dir:
+        for i, in_file in enumerate(args.input):
             temp_in_file = os.path.join(temp_dir, os.path.basename(in_file))
-            shutil.copy2(in_file, temp_in_file)
-
-
-
+            print(f'Reading: {in_file}')
             # Open loom file and read data
             with loompy.connect(temp_in_file) as ds:
-                index = concat_str_arrays(
+                index = concat_str_arrays(    
                     [ds.ra['CHROM'], ds.ra['POS'], ds.ra['REF'], ds.ra['ALT']]
                 )
+                
                 cols = samples[i]['idx'] + ((i + 1) / 10)
                 df_new = pd.DataFrame(
                     ds[:, samples[i]['idx']], index=index, columns=cols
@@ -466,7 +460,26 @@ def multiplex_looms(args):
                     ds.layers['RO'][:, samples[i]['idx']], index=index, columns=cols
                 )
 
-
+                """ 
+                for (ix, selection, view) in ds.scan(items=samples[i]['idx'], axis=1):
+                    cols = selection + ((i + 1) / 10)
+                    logging.info(selection)
+                    if 'df_new' not in locals():
+                        df_new = pd.DataFrame(view[:, :], index=index, columns=cols)
+                        ampl_new = pd.Series(view.ra['amplicon'], index=index, name=0)
+                        DP_new = pd.DataFrame(view.layers['DP'][:, :], index=index, columns=cols)
+                        GQ_new = pd.DataFrame(view.layers['GQ'][:, :], index=index, columns=cols)
+                        AD_new = pd.DataFrame(view.layers['AD'][:, :], index=index, columns=cols)
+                        RO_new = pd.DataFrame(view.layers['RO'][:, :], index=index, columns=cols)
+                    else:
+                        df_new = df_new.join(pd.DataFrame(view[:, :], index=index, columns=cols))
+                        ampl_new = ampl_new.combine_first(pd.Series(view.ra['amplicon'], index=index, name=0))
+                        DP_new = DP_new.join(pd.DataFrame(view.layers['DP'][:, :], index=index, columns=cols))
+                        GQ_new = GQ_new.join(pd.DataFrame(view.layers['GQ'][:, :], index=index, columns=cols))
+                        AD_new = AD_new.join(pd.DataFrame(view.layers['AD'][:, :], index=index, columns=cols))
+                        RO_new = RO_new.join(pd.DataFrame(view.layers['RO'][:, :], index=index, columns=cols))
+                """
+                
                 try:
                     barcodes = np.char.add(
                         ds.col_attrs['barcode'][samples[i]['idx']], f'.pat{i:.0f}'
@@ -484,26 +497,29 @@ def multiplex_looms(args):
                         raise ValueError("The file names must end with '_split1' or '_split2'.")
                     split_number = match.group(1)
                     matched_pattern = f'split{split_number}'
-                    samples[i]['name'] = [f"{x+1}_{in_file_stripped}.{matched_pattern}" for x in range(samples[i]['idx'].size)]
+                    base_name = f"_{in_file_stripped}.{matched_pattern}"
+                    counts = np.arange(samples[i]['idx'].size) + 1
+                    counts_string = np.char.mod('%d', counts)
+                    samples[i]['name'] = np.char.add(counts_string, base_name)
 
 
         # First sample, nothing to merge
-        if i == 0:
-            df = df_new
-            ampl = ampl_new
-            DP = DP_new
-            GQ = GQ_new
-            AD = AD_new
-            RO = RO_new
-            continue
+            if i == 0:
+                df = df_new
+                ampl = ampl_new
+                DP = DP_new
+                GQ = GQ_new
+                AD = AD_new
+                RO = RO_new
+                continue
 
         # Merge amplicons (keep all)
-        ampl = ampl.combine_first(ampl_new)
-        df = df.merge(df_new, left_index=True, right_index=True)
-        DP = DP.merge(DP_new, left_index=True, right_index=True)
-        GQ = GQ.merge(GQ_new, left_index=True, right_index=True)
-        AD = AD.merge(AD_new, left_index=True, right_index=True)
-        RO = RO.merge(RO_new, left_index=True, right_index=True)
+            ampl = ampl.combine_first(ampl_new)
+            df = df.merge(df_new, left_index=True, right_index=True)
+            DP = DP.merge(DP_new, left_index=True, right_index=True)
+            GQ = GQ.merge(GQ_new, left_index=True, right_index=True)
+            AD = AD.merge(AD_new, left_index=True, right_index=True)
+            RO = RO.merge(RO_new, left_index=True, right_index=True)
 
     del df_new
     del ampl_new
@@ -529,8 +545,6 @@ def multiplex_looms(args):
     dbt_total = int(args.doublets * np.sum(samples_size))
     for i in range(dbt_total):
         s1, s2 = np.random.choice(no_samples, size=2, replace=False, p=s_probs)
-        logging.info("Sample 1: %s, Sample 2: %s", s1, s2)
-        logging.info("Sample 1: %s, Sample 2: %s", samples[s1]['idx'].size, samples[s2]['idx'].size)
         c1_idx = np.random.choice(samples[s1]['idx'].size)
         c2_idx = np.random.choice(samples[s2]['idx'].size)
 
@@ -541,7 +555,7 @@ def multiplex_looms(args):
         new_name_sample1 = samples[s1]["name"][c1_idx]
         new_name_sample2 = samples[s2]["name"][c2_idx]
         new_name = f'{new_name_sample1}+{new_name_sample2}'
-
+        
         dbt_gt[new_id] = np.apply_along_axis(merge_gt, axis=1, arr=df[[c1, c2]])
         dbt_GQ[new_id] = GQ[[c1, c2]].mean(axis=1)
         dbt_DP[new_id] = (DP[[c1, c2]].mean(axis=1).round()).astype(int)
@@ -645,40 +659,16 @@ def multiplex_looms(args):
         'FREQ': np.zeros(np.sum(keep_var)),
     }
 
-    for row, var_data in enumerate(gt):
-        cell_data = np.empty((len(variants_info['CHR']), len(cells)), dtype=object)
-        for row, var_data in enumerate(gt):
-            for col, cell in enumerate(cells):
-                cell_data[row, col] = f'{RO[row, col]}:{AD[row, col]}:{var_data[col]}'
+    cell_data = np.empty((len(variants_info['CHR']), len(cells)), dtype='<U11')
+    cell_data = np.char.add(np.char.add(RO.astype(str), ':'), np.char.add(AD.astype(str), ':'))
+    cell_data = np.char.add(cell_data, gt.astype(str))
 
-        for col, cell in enumerate(cells):
-            name = cell_names[col]
-            variants_info[name] = cell_data[:, col].tolist()
+    for col, cell in enumerate(cells):
+        name = cell_names[col]
+        variants_info[name] = cell_data[:, col].tolist()
     
     return pd.DataFrame(variants_info), gt, VAF
 
-
-
-
-"""
-                for (ix, selection, view) in ds.scan(items=samples[i]['idx'], axis=1):
-                    cols = selection + ((i + 1) / 10)
-                    logging.info(selection)
-                    if 'df_new' not in locals():
-                        df_new = pd.DataFrame(view[:, :], index=index, columns=cols)
-                        ampl_new = pd.Series(view.ra['amplicon'], index=index, name=0)
-                        DP_new = pd.DataFrame(view.layers['DP'][:, :], index=index, columns=cols)
-                        GQ_new = pd.DataFrame(view.layers['GQ'][:, :], index=index, columns=cols)
-                        AD_new = pd.DataFrame(view.layers['AD'][:, :], index=index, columns=cols)
-                        RO_new = pd.DataFrame(view.layers['RO'][:, :], index=index, columns=cols)
-                    else:
-                        df_new = df_new.join(pd.DataFrame(view[:, :], index=index, columns=cols))
-                        ampl_new = ampl_new.combine_first(pd.Series(view.ra['amplicon'], index=index, name=0))
-                        DP_new = DP_new.join(pd.DataFrame(view.layers['DP'][:, :], index=index, columns=cols))
-                        GQ_new = GQ_new.join(pd.DataFrame(view.layers['GQ'][:, :], index=index, columns=cols))
-                        AD_new = AD_new.join(pd.DataFrame(view.layers['AD'][:, :], index=index, columns=cols))
-                        RO_new = RO_new.join(pd.DataFrame(view.layers['RO'][:, :], index=index, columns=cols))
-"""
 
 
 

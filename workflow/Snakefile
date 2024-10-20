@@ -33,7 +33,7 @@ rule split_files: ### This part of the pipeline is still not fully reproducible,
     conda:
         "envs/loom.yml"
     resources:
-        mem_mb=3000,
+        mem_mb_per_cpu=3000,
         runtime=90,
     log:
         output_folder / "seed_{seed}" / 'log' / 'split_{loom_file}.log',
@@ -97,7 +97,7 @@ rule pooling: ##Need to introduce proper downsampling of cells
         doublet_rate = config["doublet_rate"],
         cell_number = config["downsampling"],
     resources:
-        mem_mb=1000000,
+        mem_mb_per_cpu=10000,
         runtime=90,
     conda:
         "envs/mosaic.yml"
@@ -131,26 +131,48 @@ rule demultiplexing_demoTape:
             variants = output_folder /  "seed_{seed}" / "pools" / "pool_{pool_ID}_{seed}.csv",
             pools = output_folder / "seed_{seed}" / "pools_{seed}.txt",
         output:
-            output_folder / "seed_{seed}" / 'demultiplexed' / 'pool_{pool_ID}_{seed}_demultiplexed.profiles.tsv',
+            profiles = output_folder / "seed_{seed}" / 'demultiplexed' / 'pool_{pool_ID}_{seed}_demultiplexed.profiles.tsv',
+            assignments = output_folder / "seed_{seed}" / 'demultiplexed' / 'pool_{pool_ID}_{seed}_demultiplexed.assignments.tsv'
         resources:
-            mem_mb=4096,
+            mem_mb_per_cpu=4096,
             runtime=90,
         conda:
             "envs/sample_assignment.yml"
         log:
             output_folder / 'log' / 'demultiplexing_{pool_ID}_{seed}.log',
         params:
-            cluster_number= lambda w, input:determine_number_of_different_donors(
+            cluster_number= lambda w, input: determine_number_of_different_donors(
                 checkpoints.create_demultiplexing_scheme.get(seed=w.seed).output.pools,
                 "({})".format(w.pool_ID)
                 ),
             outbase = lambda w: output_folder / "seed_{}".format(w.seed) / 'demultiplexed' / "pool_{}_{}_demultiplexed".format(w.pool_ID, w.seed)
         shell:
             """
-            python {workflow.basedir}/scripts/demo_tape.py \
+            python {workflow.basedir}/scripts/demultiplex_distance.py \
                 --input {input.variants} \
                 -n {params.cluster_number} \
                 --output {params.outbase} \
+            &> {log}
+           """
+
+
+rule assign_samples:
+        input:
+            demultiplexing_assignments = output_folder / "seed_{seed}" / 'demultiplexed' / 'pool_{pool_ID}_{seed}_demultiplexed.assignments.tsv',
+        output:
+            output_folder / "seed_{seed}" / 'demultiplexed' / 'pool_{pool_ID}_{seed}_ground_truth_assignment.tsv',
+        resources:
+            mem_mb_per_cpu=4096,
+            runtime=90,
+        conda:
+            "envs/sample_assignment.yml"
+        log:
+            output_folder / 'log' / 'assign_samples.{pool_ID}_{seed}.log',
+        shell:
+            """
+            python {workflow.basedir}/scripts/assign_subsample_simulation.py \
+                --demultiplexing_assignment {input.demultiplexing_assignments} \
+                --output {output} \
             &> {log}
            """
 

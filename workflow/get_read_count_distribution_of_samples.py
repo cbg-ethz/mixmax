@@ -3,7 +3,6 @@ from pathlib import Path
 import loompy
 import pandas as pd
 import numpy as np
-from scipy.stats import poisson
 
 def process_loom_files(folder_path):
     folder = Path(folder_path)

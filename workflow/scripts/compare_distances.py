@@ -49,7 +49,7 @@ cmap.set_bad(color='grey')
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Compare distances between samples")
-    parser.add_argument("--tsv_files", nargs='+' , type=str, help="Path to the directory containing the TSV files")
+    parser.add_argument("--tsv_files", nargs='+' , type=str, help="Path to TSV files containing the genotypes of the clusters")
     parser.add_argument("--pool_scheme", type=str, help="Path to the pool scheme file")
     return parser.parse_args()
 
@@ -65,29 +65,44 @@ all_columns = set()
 for df in dfs:
     all_columns.update(df.columns)
 
-# Ensure all DataFrames have the same columns, filling missing columns with -1
-for df in dfs:
+print(all_columns)
+
+# Ensure all DataFrames have the same columns, filling missing columns with nan
+for idx,df in enumerate(dfs):
     for col in all_columns:
         if col not in df.columns:
-            df[col] = np.nan
+            dfs[idx][col] = np.nan
+
+for idx,df in enumerate(dfs):
+    dfs[idx] = df[sorted(all_columns)]
+    print(dfs[idx])
+    
+    print(all([col in dfs[idx].columns for col in all_columns]))
 
 
 # Concatenate all DataFrames
-concatenated_df = pd.concat(dfs[:2], ignore_index=True)
+concatenated_df = pd.concat(dfs, ignore_index=True)[sorted(all_columns)]
 
 
 print(concatenated_df)
 # Remove columns which are above 0.9 in all row entries and below 0.1 in all row entries
+
 cols_to_remove = concatenated_df.columns[
     (concatenated_df > 0.9).all(axis=0) | (concatenated_df < 0.1).all(axis=0)
 ]
-    # Remove columns which have entries between 0.45 and 0.55 for all row entries
+# Remove columns which have entries between 0.45 and 0.55 for all row entries
 cols_to_remove_45_55 = concatenated_df.columns[
     ((concatenated_df >= 0.45) & (concatenated_df <= 0.55)).all(axis=0)
 ]
+print(f"cols_to_remove in all_columns: {all((col in all_columns for col in cols_to_remove))}")
+print(f"cols_to_remove_45_55 in all_columns: {all((col in all_columns for col in cols_to_remove_45_55))}")
 
 concatenated_df.drop(columns=cols_to_remove, inplace=True)
 concatenated_df.drop(columns=cols_to_remove_45_55, inplace=True)
+
+for idx,df in enumerate(dfs):
+    dfs[idx] = df.drop(columns=cols_to_remove, inplace=False)
+    dfs[idx] = df.drop(columns=cols_to_remove_45_55, inplace=False)
 
 
 # Compute the distance matrix
@@ -125,25 +140,6 @@ for i, df1 in enumerate(dfs):
 plt.tight_layout()
 plt.savefig("/cluster/work/bewi/members/jgawron/projects/Demultiplexing/pairwise_distances_heatmaps.png")
 
-distance_matrix = pdist(concatenated_df.fillna(0), metric='euclidean')
-distance_matrix = pdist(concatenated_df.values, metric=custom_distance)
-distance_matrix = squareform(distance_matrix)
-
-# Convert the distance matrix to a DataFrame for easier plotting
-distance_df = pd.DataFrame(distance_matrix)
-
-# Plot the heatmap
-plt.figure(figsize=(10, 8))
-
-
-
-# Mask the values that are -1
-masked_distance_df = distance_df.mask(distance_df == -1)
-
-# Plot the heatmap with the custom colormap
-sns.heatmap(masked_distance_df, cmap=cmap, cbar_kws={'label': 'Distance'})
-plt.title('Distance Matrix Heatmap')
-plt.savefig("/cluster/work/bewi/members/jgawron/projects/Demultiplexing/prototype.png")
 
 
 fig, axes = plt.subplots(nrows=1, ncols=len(dfs), figsize=(15, 5))
@@ -153,21 +149,6 @@ for i, df in enumerate(dfs):
     axes[i].set_title(f'Heatmap {i+1}')
 plt.savefig("/cluster/work/bewi/members/jgawron/projects/Demultiplexing/vectors_heatmaps.png")
 
-# Compute the matrix of counts of non-NaN pairs
-non_nan_counts = np.zeros((concatenated_df.shape[0], concatenated_df.shape[0]))
-
-for i in range(concatenated_df.shape[0]):
-    for j in range(concatenated_df.shape[0]):
-        non_nan_counts[i, j] = np.sum(~np.isnan(concatenated_df.iloc[i]) & ~np.isnan(concatenated_df.iloc[j]))
-
-# Convert the counts matrix to a DataFrame for easier plotting
-non_nan_counts_df = pd.DataFrame(non_nan_counts)
-
-# Plot the heatmap of non-NaN pairs
-plt.figure(figsize=(10, 8))
-sns.heatmap(non_nan_counts_df, cmap='viridis', cbar_kws={'label': 'Number of Non-NaN Pairs'})
-plt.title('Number of Non-NaN Pairs Heatmap')
-plt.savefig("/cluster/work/bewi/members/jgawron/projects/Demultiplexing/non_nan_pairs_heatmap.png")
 
 
 # Function to compute the ratio of the smallest and the second smallest value in a matrix
@@ -239,7 +220,7 @@ for i, j, _ in sorted_ratios:
 
 # Print the pairs with the lowest values
 for i, j, row, col in lowest_value_pairs:
-    print(f'Lowest value in Distance Matrix DF{i+1} vs DF{j+1}: Row = {row}, Column = {col}')
+    print(f'Lowest value in Distance Matrix DF{i} vs DF{j}: Row = {row}, Column = {col}')
 
 
 
@@ -259,11 +240,3 @@ for i, j, row, col in lowest_value_pairs:
 for i in range(len(used_samples)):
     unused_sample = next(sample for sample in range(len(dfs[i])) if sample not in used_samples[i])
     print(f"Sample {unused_sample} from pool {i}: {demultiplexing_scheme[(i,i,0)]}")
-
-
-
-# Save the concatenated DataFrame to a new TSV file
-#output_file = '/cluster/work/bewi/members/jgawron/projects/Demultiplexing/concatenated.tsv'
-#concatenated_df.to_csv(output_file, sep='\t', index=False)
-
-#print(f"Concatenated TSV file saved to {output_file}")
