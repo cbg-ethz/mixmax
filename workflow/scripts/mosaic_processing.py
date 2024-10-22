@@ -425,6 +425,7 @@ def multiplex_looms(args):
             with loompy.connect(temp_in_file) as ds:
                 no_cells[i] = ds.shape[1]
     
+        ##To obtain an unbiased cell count and doublet rate, we initially start with  the number of cells and add (number of cells) * doublet_rate many samples. Later, pairs of cells will be merged to a doublet, which will reduce the total cell count again accordingly. 
         samples_size = subsample_cells(no_cells, np.array(args.ratio), args.cell_no)
     
         samples = {}
@@ -541,8 +542,11 @@ def multiplex_looms(args):
     dbt_GQ = {}
     dbt_AD = {}
     dbt_RO = {}
-
-    dbt_total = int(args.doublets * np.sum(samples_size))
+    
+    #We have sample_size + doublet_rate * sample_size many cells in total.
+    #The number of doublets is doublet_rate* sample_size = doublet_rate/(1+doublet_rate) * total_cell_count
+    
+    dbt_total = int(args.doublets/(1 + args.doublets) * np.sum(samples_size))
     for i in range(dbt_total):
         s1, s2 = np.random.choice(no_samples, size=2, replace=False, p=s_probs)
         c1_idx = np.random.choice(samples[s1]['idx'].size)
