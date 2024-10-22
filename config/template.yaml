@@ -3,5 +3,5 @@ loom_files: /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/
 seed: __seed__
 n_samples: 10
 max_pool_size: 4
-doublet_rate: 0.1
-downsampling: 5000
+doublet_rate: __doublet_rate__
+downsampling: __cell_count__

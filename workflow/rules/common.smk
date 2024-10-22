@@ -4,13 +4,17 @@ import logging
 import random
 
 import numpy as np
+import pandas as pd
+from snakemake.utils import Paramspace
 
-#logging.basicConfig(format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M",level=logging.INFO)
+paramspace = Paramspace(pd.read_csv(Path(workflow.basedir) / 'sandbox' / 'parameter_space.tsv', sep='\t'))
 
 output_folder = Path(config["output_folder"])
 loom_file_path = Path(config["loom_files"])
 number_of_samples = config.get("n_samples", 10)
 seed=config["seed"]
+doublet_rate = config["doublet_rate"]
+cell_count = config["downsampling"]
 
 loom_files = []
 for p in loom_file_path.iterdir():
@@ -19,8 +23,6 @@ for p in loom_file_path.iterdir():
 
 
 
-def generate_input_samples(loom_files, number_of_samples):
-    random.sample(loom_files, number_of_samples)
 
 def get_variant_list(pool_ID):
     file = output_folder / f"pool_{pool_ID}.txt"
@@ -50,9 +52,10 @@ def sample_mixing_ratios(seed, max_pool_size):
     return " ".join(str(item) for item in ratios)
 
 
-def get_demultiplexed_samples(pool_file):
-    pools = yaml.safe_load(open(checkpoints.create_demultiplexing_scheme.get(seed=w.seed).output, 'r'))
-    samples = []
+def get_demultiplexed_samples(wildcards):
+    pools = yaml.safe_load(open(checkpoints.create_demultiplexing_scheme.get(seed=wildcard.seed).output, 'r'))
+    pools = list(pools.keys())
+    demultiplexed_samples = [f"pool_{pool}_{wildcard.seed}_demultiplexed.assignments.tsv" for pool in pools]
 
         
 def determine_number_of_different_donors(pool_file, pool_ID):
@@ -66,18 +69,34 @@ def determine_number_of_different_donors(pool_file, pool_ID):
             elif "_split2" in sample.stem:
                 unique_patterns.add(sample.stem.replace("_split2", ""))
                 
-    return len(unique_patterns)+1
+    return len(unique_patterns)
 
+
+def get_all_demultiplexed_assignments(wildcards, wildcard_pattern):
+    demultiplexing_scheme = yaml.safe_load(open(checkpoints.create_demultiplexing_scheme.get(seed=wildcards.seed, pool_size = wildcards.pool_size, robust = wildcards.robust).output.pools, 'r'))
+    pool_names = list(demultiplexing_scheme.keys())
+    pool_names = [pool_name.strip("()") for pool_name in pool_names]
     
-if number_of_samples > len(loom_files):
-    logging.error(f"Number of samples ({number_of_samples}) is greater than the number of loom files ({len(loom_files)}). Continuing with maximal number of samples.")
-    input_samples = loom_files
-    number_of_samples = len(loom_files)
-else:
-    input_samples = random.sample(loom_files, number_of_samples)
+    demultiplexed_files = []
+    file_path = output_folder / f"seed_{wildcards.seed}" / wildcard_pattern / 'demultiplexed' 
+    for pool in pool_names:
+        demultiplexed_files.append(file_path / f"pool_{pool}_{wildcards.seed}_demultiplexed.assignments.tsv")
 
-input_samples = generate_input_samples(loom_files, number_of_samples)
+    return demultiplexed_files
 
-#output_files.append(output_folder / f"seed_{seed}" / f"pools_{seed}.txt")
-output_files = [output_folder / f"seed_{seed}" / "demultiplexed" / f"pool_{pool_ID}_{seed}_ground_truth_assignment.tsv" for pool_ID in ["0.0", "1.0", "2.0", "3.0"]]
-output_files
+
+def get_all_demultiplexed_profiles(wildcards, wildcard_pattern):
+    demultiplexing_scheme = yaml.safe_load(open(checkpoints.create_demultiplexing_scheme.get(seed=wildcards.seed, pool_size = wildcards.pool_size, robust = wildcards.robust).output.pools, 'r'))
+    pool_names = list(demultiplexing_scheme.keys())
+    pool_names = [pool_name.strip("()") for pool_name in pool_names]
+    
+    demultiplexed_files = []
+    file_path = output_folder / f"seed_{wildcards.seed}" / wildcard_pattern / 'demultiplexed' 
+    for pool in pool_names:
+        demultiplexed_files.append(file_path / f"pool_{pool}_{wildcards.seed}_demultiplexed.profiles.tsv")
+
+    return demultiplexed_files
+
+
+
+output_files = expand(output_folder / f"seed_{seed}" / "{params}" / 'sample_assignment.yaml', params=paramspace.instance_patterns) + expand(output_folder / f"seed_{seed}" / "{params}" / 'sample_identity.yaml', params=paramspace.instance_patterns)

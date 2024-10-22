@@ -9,14 +9,17 @@ import numpy as np
 logging.basicConfig(format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M",level=logging.INFO)
 
 
-def define_demultiplexing_scheme_optimal_case(maximal_number_of_samples, maximal_pool_size, n_samples):
+def define_demultiplexing_scheme_optimal_case(maximal_number_of_samples, maximal_pool_size, n_samples, robust):
     if n_samples % maximal_number_of_samples != 0:
         raise ValueError("Number of samples must be a multiple of maximal number of samples to run this function!")
     demultiplexing_scheme = {}
     number_of_iterations = int(n_samples / maximal_number_of_samples)
-    unordered_pairs_unique_pairs = list(itertools.combinations(range(maximal_pool_size), 2))
-    diagonal = list(zip(range(maximal_pool_size), range(maximal_pool_size)))
-    unordered_pairs = unordered_pairs_unique_pairs + diagonal                           
+    if not robust:
+        unordered_unique_pairs = list(itertools.combinations(range(maximal_pool_size), 2))
+        diagonal = list(zip(range(maximal_pool_size), range(maximal_pool_size)))
+        unordered_pairs = unordered_unique_pairs + diagonal
+    else:
+        unordered_pairs = list(itertools.combinations(range(maximal_pool_size+1), 2))                           
 
     for idx1 in range(number_of_iterations):
         for idx2, pair in enumerate(unordered_pairs):
@@ -25,7 +28,8 @@ def define_demultiplexing_scheme_optimal_case(maximal_number_of_samples, maximal
     return demultiplexing_scheme
 
 
-def find_demultiplexing_scheme(maximal_pool_size, n_samples):
+
+def find_demultiplexing_scheme(maximal_pool_size, n_samples, robust):
     maximal_number_of_samples = (maximal_pool_size * (maximal_pool_size+1))/2
 
     if n_samples % maximal_number_of_samples != 0:
@@ -33,7 +37,8 @@ def find_demultiplexing_scheme(maximal_pool_size, n_samples):
         raise NotImplementedError
     else:
         logging.info("Creating multiplexing scheme")
-        demultiplexing_scheme = define_demultiplexing_scheme_optimal_case(maximal_number_of_samples = maximal_number_of_samples, maximal_pool_size = maximal_pool_size, n_samples = n_samples)
+        demultiplexing_scheme = define_demultiplexing_scheme_optimal_case(maximal_number_of_samples = maximal_number_of_samples, maximal_pool_size = maximal_pool_size, n_samples = n_samples, robust = robust)
+        
         logging.info(f'Demultiplexing scheme: {demultiplexing_scheme}')
 
         return demultiplexing_scheme
@@ -117,7 +122,7 @@ def parse_args():
 def main(args):
     input_samples = load_input_samples(args.input_sample_file)
     n_samples = len(input_samples)
-    demultiplexing_scheme = find_demultiplexing_scheme(args.maximal_pool_size, n_samples)
+    demultiplexing_scheme = find_demultiplexing_scheme(args.maximal_pool_size, n_samples, args.robust)
     pool_scheme = multiplexing_scheme_format2pool_format(demultiplexing_scheme)
     pools_summary = select_samples_for_pooling(pool_scheme, args.input_dir, input_samples)
     logging.debug(f"Output: {pools_summary.keys()}")

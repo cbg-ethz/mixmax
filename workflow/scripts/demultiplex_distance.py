@@ -174,6 +174,7 @@ class demoTape:
         self.sgt_ids = np.array(
             [i for i in np.unique(self.assignment)]
         )
+        self.delete_garbage_cluster()
         #self.merge_surplus_singlets()
 
     # -------------------------------- DENDROGRAM ----------------------------------
@@ -207,6 +208,16 @@ class demoTape:
         self.profiles = np.zeros(shape=(clusters.size, self.prof_len))
         for cl_id, cl in enumerate(clusters):
             self.profiles[cl_id] = self.get_profile(cl)
+
+    def delete_garbage_cluster(self):
+        clusters = np.unique(self.assignment)
+        cluster_sizes = np.bincount(self.assignment)
+        smallest_cluster_index = np.argmin(cluster_sizes)
+        smallest_cluster = clusters[smallest_cluster_index]
+        keep = self.assignment != smallest_cluster
+        self.assignment = self.assignment[keep]
+        self.sgt_ids = self.sgt_ids[self.sgt_ids != smallest_cluster]
+        self.VAF = self.VAF[keep]
 
     def set_dbt_ids(self):
         cl_size = np.unique(self.assignment, return_counts=True)[1] / self.cells.size
@@ -753,7 +764,6 @@ class demoTape_reads(demoTape):
         pass
 
     def save_profiles(self, output):
-        # Save SNV profiles to identy patients
         cl_map, _ = self.get_cl_map()
         VAF_df = self.get_VAF_profile(self.sgt_ids)
         VAF_df.index = [
@@ -960,7 +970,7 @@ def main(args):
 
     for in_file in in_files:
         if args.metric == 'reads':
-            dt = demoTape_reads(in_file, args.clusters)
+            dt = demoTape_reads(in_file, args.clusters+1)
         else:
             dt = demoTape_gt(in_file, args.clusters, args.metric)
 
