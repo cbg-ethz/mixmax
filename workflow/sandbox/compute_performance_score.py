@@ -84,7 +84,7 @@ def compute_clustering_performance_score(subfolder):
     return mean(v_measures)
 
 
-def main(input_dir):
+""" def main(input_dir):
     if not isinstance(input_dir, Path):
         input_dir = Path(input_dir)
     results = []
@@ -114,12 +114,48 @@ def main(input_dir):
                     if len(results) % 100 == 0:
                         temp_df = pd.DataFrame(results)
                         temp_df.to_csv('more_intermediate_results.csv', mode='a', header=False, index=False)
-                        results.clear()
+                        results.clear() """
+
+def main(input_dir):
+    if not isinstance(input_dir, Path):
+        input_dir = Path(input_dir)
+    results = []
+
+    for seed_folder in input_dir.glob('seed*'):
+        subfolder = seed_folder / "robust~True" / "pool_size~4" / "doublet_rate~0.05" / "cell_count~1000"
+        sample_assignment_path = subfolder /  "sample_assignment.yaml" 
+        sample_identity_path = subfolder / "sample_identity.yaml" 
+        
+        logging.info(f"Processing simulation run for {subfolder}")
+
+        if sample_identity_path.exists() and sample_assignment_path.exists():
+            logging.info("Subfolder exists!")
+            sample_identity_is_pathological, score = process_simulation_run(subfolder)
+
+            mean_v_score = compute_clustering_performance_score(subfolder)
+
+            seed_number = int(seed_folder.name.split('_')[1])
+                    
+            results.append({
+                'seed': seed_number,
+                'doublet_rate': 0.05,
+                'cell_count': 1000,
+                'score': score,
+                'sample_identity_is_pathological': sample_identity_is_pathological,
+                'v_score': mean_v_score
+            })
+
+                    # Periodically save results to a file to avoid memory burden
+            if len(results) % 100 == 0:
+                temp_df = pd.DataFrame(results)
+                temp_df.to_csv('/cluster/work/bewi/members/jgawron/projects/Demultiplexing/Demultiplexing_simulations/workflow/sandbox/results_for_robust.csv', mode='a', header=False, index=False)
+                results.clear()
+
 
     # Save any remaining results
     if results:
         df = pd.DataFrame(results)
-        df.to_csv('more_intermediate_results.csv', mode='a', header=not Path('intermediate_results.csv').exists(), index=False)
+        df.to_csv('/cluster/work/bewi/members/jgawron/projects/Demultiplexing/Demultiplexing_simulations/workflow/sandbox/results_for_robust.csv', mode='a', header=not Path('/cluster/work/bewi/members/jgawron/projects/Demultiplexing/Demultiplexing_simulations/workflow/sandbox/results_for_robust.csv').exists(), index=False)
 
 
 if __name__ == '__main__':

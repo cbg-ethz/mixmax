@@ -192,5 +192,6 @@ rule assign_samples:
             --pool_scheme {input.pools} \
             --output_plot {output.heatmap} \
             --output {output.sample_assignment} \
-            > {log}
+            --robust {wildcards.robust} \
+            &> {log}
         """

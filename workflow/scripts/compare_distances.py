@@ -50,6 +50,7 @@ def parse_args():
     parser.add_argument("--pool_scheme", type=str, help="Path to the pool scheme file")
     parser.add_argument("--output_plot", type=str, help="Output heatmap")
     parser.add_argument("--output", type=str, help="sample assignment")
+    parser.add_argument("--robust", type=bool, required=False, default = False, help="Robust assignment")
     return parser.parse_args()
 
 
@@ -255,10 +256,10 @@ for i, j, row, col in lowest_value_pairs:
         row, col = col, row
     print(f'Sample {row} from pool {i} and sample {col} from pool {j}: {demultiplexing_scheme[(i,j,0)]}')
 
-
-for i in range(len(used_samples)):
-    unused_sample = next(sample for sample in range(len(dfs[i])) if sample not in used_samples[i])
-    print(f"Sample {unused_sample} from pool {i}: {demultiplexing_scheme[(i,i,0)]}")
+if args.robust == False: 
+    for i in range(len(used_samples)):
+        unused_sample = next(sample for sample in range(len(dfs[i])) if sample not in used_samples[i])
+        print(f"Sample {unused_sample} from pool {i}: {demultiplexing_scheme[(i,i,0)]}")
 
 
 
@@ -277,13 +278,13 @@ for i, j, row, col in lowest_value_pairs:
     else:
         sample_assignment[pooling_scheme_keys[j]][col] = demultiplexing_scheme[(i, j, 0)]
 
-
-for i in range(len(used_samples)):
-    unused_sample = next(sample for sample in range(len(dfs[i])) if sample not in used_samples[i])
-    if pooling_scheme_keys[i] not in sample_assignment.keys():
-        sample_assignment[pooling_scheme_keys[i]] = {unused_sample: demultiplexing_scheme[(i, i, 0)]}
-    else:
-        sample_assignment[pooling_scheme_keys[i]][unused_sample] = demultiplexing_scheme[(i, i, 0)]
+if args.robust == False: 
+    for i in range(len(used_samples)):
+        unused_sample = next(sample for sample in range(len(dfs[i])) if sample not in used_samples[i])
+        if pooling_scheme_keys[i] not in sample_assignment.keys():
+            sample_assignment[pooling_scheme_keys[i]] = {unused_sample: demultiplexing_scheme[(i, i, 0)]}
+        else:
+            sample_assignment[pooling_scheme_keys[i]][unused_sample] = demultiplexing_scheme[(i, i, 0)]
 
 with open(args.output, 'w') as yaml_file:
     yaml.dump(sample_assignment, yaml_file)
