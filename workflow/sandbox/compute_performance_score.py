@@ -113,13 +113,13 @@ def main(input_dir):
                     # Periodically save results to a file to avoid memory burden
                     if len(results) % 100 == 0:
                         temp_df = pd.DataFrame(results)
-                        temp_df.to_csv('intermediate_results.csv', mode='a', header=False, index=False)
+                        temp_df.to_csv('more_intermediate_results.csv', mode='a', header=False, index=False)
                         results.clear()
 
     # Save any remaining results
     if results:
         df = pd.DataFrame(results)
-        df.to_csv('intermediate_results.csv', mode='a', header=not Path('intermediate_results.csv').exists(), index=False)
+        df.to_csv('more_intermediate_results.csv', mode='a', header=not Path('intermediate_results.csv').exists(), index=False)
 
 
 if __name__ == '__main__':

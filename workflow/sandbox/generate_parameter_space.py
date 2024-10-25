@@ -2,10 +2,10 @@ import itertools
 import csv
 
 # Define the parameter values
-cell_counts = [250, 500, 1000, 2000, 3000, 4000, 5000]
-doublet_rates = [0.0, 0.05, 0.1, 0.2]
-pool_sizes = [3, 4, 5, 6]
-robust_values = [True, False]
+cell_counts = [1000]
+doublet_rates = [0.05]
+pool_sizes = [4]
+robust_values = [True]
 
 # Generate all combinations of parameters
 combinations = list(itertools.product(robust_values, pool_sizes, doublet_rates, cell_counts))

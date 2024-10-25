@@ -92,8 +92,6 @@ rule pooling: ##Need to introduce proper downsampling of cells
         minHetVAF=config.get("mosaic", {}).get("minHetVAF", 0.35),
         proximity=config.get("mosaic", {}).get("proximity", "25 50 100 200"),
         ratios = lambda w, input: sample_mixing_ratios(w.seed, len(input.split_files)),
-        doublet_rate = config["doublet_rate"],
-        cell_number = config["downsampling"],
     resources:
         mem_mb_per_cpu=10000,
         runtime=90,
@@ -118,8 +116,8 @@ rule pooling: ##Need to introduce proper downsampling of cells
             --proximity {params.proximity} \
             --full_output \
             --ratio {params.ratios} \
-            --doublets {params.doublet_rate} \
-            --cell_no {params.cell_number} \
+            --doublets {wildcards.doublet_rate} \
+            --cell_no {wildcards.cell_count} \
             &> {log}
         """
 
@@ -131,6 +129,13 @@ rule demultiplexing_demoTape:
         output:
             profiles = output_folder / "seed_{seed}" / paramspace.wildcard_pattern / 'demultiplexed' / 'pool_{pool_ID}_{seed}_demultiplexed.profiles.tsv',
             assignments = output_folder / "seed_{seed}" / paramspace.wildcard_pattern / 'demultiplexed' / 'pool_{pool_ID}_{seed}_demultiplexed.assignments.tsv'
+        params:
+            cluster_number= lambda w, input: determine_number_of_different_donors(
+                checkpoints.create_demultiplexing_scheme.get(seed=w.seed, pool_size = w.pool_size, robust = w.robust).output.pools,
+                "({})".format(w.pool_ID)
+                ),
+            outbase = lambda w: output_folder / "seed_{}".format(w.seed) / paramspace.wildcard_pattern / 'demultiplexed' / "pool_{}_{}_demultiplexed".format(w.pool_ID, w.seed),
+            output_folder = output_folder
         resources:
             mem_mb_per_cpu=4096,
             runtime=90,
@@ -138,18 +143,12 @@ rule demultiplexing_demoTape:
             "envs/sample_assignment.yml"
         log:
             output_folder / 'log' / 'demultiplexing_{pool_ID}_{seed}_{doublet_rate}_{cell_count}_{pool_size}_robust{robust}.log',
-        params:
-            cluster_number= lambda w, input: determine_number_of_different_donors(
-                checkpoints.create_demultiplexing_scheme.get(seed=w.seed, pool_size = w.pool_size, robust = w.robust).output.pools,
-                "({})".format(w.pool_ID)
-                ),
-            outbase = lambda w: output_folder / "seed_{}".format(w.seed) /  "{}".format(w.doublet_rate) / "{}".format(w.cell_count) / 'demultiplexed' / "pool_{}_{}_demultiplexed".format(w.pool_ID, w.seed)
         shell:
             """
             python {workflow.basedir}/scripts/demultiplex_distance.py \
                 --input {input.variants} \
                 -n {params.cluster_number} \
-                --output {params.outbase} \
+                --output {params.output_folder}/seed_{wildcards.seed}/robust~{wildcards.robust}/pool_size~{wildcards.pool_size}/doublet_rate~{wildcards.doublet_rate}/cell_count~{wildcards.cell_count}/demultiplexed/pool_{wildcards.pool_ID}_{wildcards.seed}_demultiplexed  \
             &> {log}
            """
 

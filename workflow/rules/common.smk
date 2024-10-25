@@ -11,10 +11,8 @@ paramspace = Paramspace(pd.read_csv(Path(workflow.basedir) / 'sandbox' / 'parame
 
 output_folder = Path(config["output_folder"])
 loom_file_path = Path(config["loom_files"])
-number_of_samples = config.get("n_samples", 10)
+#number_of_samples = config.get("n_samples", 10)
 seed=config["seed"]
-doublet_rate = config["doublet_rate"]
-cell_count = config["downsampling"]
 
 loom_files = []
 for p in loom_file_path.iterdir():

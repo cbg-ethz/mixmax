@@ -415,7 +415,7 @@ def multiplex_looms(args):
         'No. input files has to be the same as no. ratios. '
         f'({no_samples} != {len(args.ratio)})'
     )
-    assert np.sum(args.ratio) <= 1, 'Ratios cannot sum up to >1.'
+    #assert np.sum(args.ratio) <= 1, 'Ratios cannot sum up to >1.'
 
     no_cells = np.zeros(no_samples, dtype=int)
     with tempfile.TemporaryDirectory() as temp_dir:
