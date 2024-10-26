@@ -1,4 +1,4 @@
-#mixmax
+# mixmax
 
 * `create_demultiplexing_scheme.py` takes the number of samples and the maximal pool size as input and outputs a demultiplexin scheme.
 
