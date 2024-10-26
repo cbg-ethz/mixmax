@@ -1,0 +1,2 @@
+/test/folder/loom1.loom
+/test/folder/loom2.loom

@@ -1,0 +1,24 @@
+(0.0):
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-117-001_split1.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-38-002_split1.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-118-001_split1.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-119-001_split1.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-119-001_split2.loom
+(1.0):
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-117-001_split2.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-111-001_split1.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-120-001_split1.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-107-002_split1.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-107-002_split2.loom
+(2.0):
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-38-002_split2.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-111-001_split2.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-107-001_split1.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-103-001_split1.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-103-001_split2.loom
+(3.0):
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-118-001_split2.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-120-001_split2.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-107-001_split2.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-110-001_split1.loom
+- /cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_123/loom/AML-110-001_split2.loom

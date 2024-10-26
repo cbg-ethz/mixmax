@@ -1,4 +1,5 @@
 import argparse
+import logging
 
 import pandas as pd
 import seaborn as sns
@@ -161,11 +162,34 @@ for data1, df1 in enumerate(dfs):
                 distance_matrix[i, j] = custom_distance(df1.iloc[i].values, df2.iloc[j].values)
         distance_matrices[data1, data2] = distance_matrix
 
+
+remove = None
+""" if args.robust == True:
+    for i in range(len(dfs)):
+        distance_matrix = distance_matrices[i, i]
+        min_off_diagonal = np.min(distance_matrix + np.eye(distance_matrix.shape[0]) * np.inf)
+        minimal_value = np.inf
+        logging.warning(min_off_diagonal)
+        if (min_off_diagonal < 10) and (min_off_diagonal < minimal_value):
+            remove = i
+            minimal_value = min_off_diagonal
+
+    if remove is not None:
+    #    dfs.pop(remove)
+    #    distance_matrices = np.delete(distance_matrices, remove, axis=0)
+    #    distance_matrices = np.delete(distance_matrices, remove, axis=1)
+        args.robust = False
+        logging.warning(f"Discarding dataset {remove} and going into non-robust mode") """
+
 # Plot the heatmaps for each pair of DataFrames
 fig, axes = plt.subplots(nrows=len(dfs), ncols=len(dfs), figsize=(20, 20))
 for i, df1 in enumerate(dfs):
     for j, df2 in enumerate(dfs):
-        sns.heatmap(distance_matrices[i,j], ax=axes[i, j], cmap=cmap, cbar=False)
+        """ if remove is not None:
+            if i == remove or j == remove:
+                continue
+        """
+        sns.heatmap(distance_matrices[i, j], ax=axes[i, j], cmap=cmap, cbar=False)
         axes[i, j].set_title(f'Distance: DF{i+1} vs DF{j+1}')
 plt.tight_layout()
 
@@ -201,10 +225,18 @@ lowest_value_pairs = []
 
 
 used_samples = [[]*len(dfs) for _ in range(len(dfs))]
+""" if remove is not None:
+    for j in range(len(dfs)):
+        if j != remove:
+            used_samples[remove].extend(range(len(dfs[remove])))
+            used_samples[j].extend(range(len(dfs[j]))) """
 
 for i, j, _ in sorted_ratios:
     if i <= j:
         continue
+    """ if remove is not None:
+        if i == remove or j == remove:
+            continue """
 
     distance_matrix = distance_matrices[i, j]
 

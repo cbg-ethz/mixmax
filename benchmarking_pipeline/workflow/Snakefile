@@ -97,6 +97,7 @@ rule pooling: ##Need to introduce proper downsampling of cells
         runtime=90,
     conda:
         "envs/mosaic.yml"
+    group: "demultiplexing_simulation"
     log:
         output_folder / "seed_{seed}" / 'log' / 'pooling_{pool_ID}_{seed}_{doublet_rate}_{cell_count}_{pool_size}_robust{robust}.log'
     shell:
@@ -141,6 +142,7 @@ rule demultiplexing_demoTape:
             runtime=90,
         conda:
             "envs/sample_assignment.yml"
+        group: "demultiplexing_simulation"
         log:
             output_folder / 'log' / 'demultiplexing_{pool_ID}_{seed}_{doublet_rate}_{cell_count}_{pool_size}_robust{robust}.log',
         shell:
@@ -163,6 +165,7 @@ rule label_samples:
             runtime=90,
         conda:
             "envs/sample_assignment.yml"
+        group: "assess_simulation_results"
         log:
             output_folder / 'log' / 'label_samples.{seed}_{doublet_rate}_{cell_count}_{pool_size}_robust{robust}.log',
         shell:
@@ -183,6 +186,7 @@ rule assign_samples:
         heatmap = output_folder / "seed_{seed}" / paramspace.wildcard_pattern / 'sample_assignment_heatmap.png',
     conda:
         "envs/sample_assignment.yml"
+    group: "assess_simulation_results"
     log:
         output_folder / 'log' / 'assign_samples.{seed}_{doublet_rate}_{cell_count}_{pool_size}_robust{robust}.log',
     shell:

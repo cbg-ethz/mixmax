@@ -4,9 +4,9 @@ import logging
 import yaml
 import pandas as pd
 from sklearn.metrics import v_measure_score
-from statistics import mean
 
-logging.basicConfig(format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M",level=logging.DEBUG)
+
+logging.basicConfig(format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M",level=logging.INFO)
 
 
 def compute_score(labels, estimate):
@@ -20,11 +20,13 @@ def compute_score(labels, estimate):
                 mismatches += 1
             
     return mismatches / total_counts
-#def preprocess_output():
+
 
 
 
 def load_data(path):
+    if not isinstance(path, Path):
+        path = Path(path)
     with open(path / 'sample_identity.yaml', 'r') as file:
         sample_identity = yaml.safe_load(file)
 
@@ -35,15 +37,19 @@ def load_data(path):
 
 
 def preprocess_labels(sample_identity):
+    pathological_sample_identity = False
+
     for key, value_dict in sample_identity.items():
         values = [v for k, v in value_dict.items() if k != '-1']
         for sub_key, value in value_dict.items():
-            value_dict[sub_key] = int(value.replace('+', ''))
+            value_dict[sub_key] = value.replace('+', '')
+        for sub_key, value in value_dict.items():
+            value_dict[sub_key] = int(value)
+
         if len(values) != len(set(values)):
             logging.error(f"Duplicate values found in sample_identity for key {key}: {values}")
-            return True
-    return False
-
+            pathological_sample_identity = True
+    return pathological_sample_identity, sample_identity
 
 
 def preprocess_sample_assignment(sample_assignment):
@@ -54,11 +60,14 @@ def preprocess_sample_assignment(sample_assignment):
 
 def process_simulation_run(path):
     sample_identity, sample_assignment = load_data(path)
-    sample_identity_is_pathological = preprocess_labels(sample_identity)
+    sample_identity_is_pathological, sample_identity = preprocess_labels(sample_identity)
     preprocess_sample_assignment(sample_assignment)
     
-    logging.info(sample_identity_is_pathological)
+    logging.debug(sample_identity_is_pathological)
+    logging.debug(sample_assignment)
+    logging.debug(sample_identity)
     score = compute_score(sample_identity, sample_assignment)
+    logging.debug(score)
 
     return sample_identity_is_pathological, score
 
@@ -81,12 +90,10 @@ def compute_clustering_performance_score(subfolder):
         v_measure = v_measure_score(ground_truth_labels, cluster_assignments)
         v_measures.append(v_measure)
 
-    return mean(v_measures)
+    return min(v_measures)
 
 
-""" def main(input_dir):
-    if not isinstance(input_dir, Path):
-        input_dir = Path(input_dir)
+def main(input_dir):
     results = []
     for seed_folder in input_dir.glob('seed*'):
         for subfolder_0 in seed_folder.glob('0*'):
@@ -114,15 +121,18 @@ def compute_clustering_performance_score(subfolder):
                     if len(results) % 100 == 0:
                         temp_df = pd.DataFrame(results)
                         temp_df.to_csv('more_intermediate_results.csv', mode='a', header=False, index=False)
-                        results.clear() """
+                        results.clear()
+    if results:
+        df = pd.DataFrame(results)
+        df.to_csv('more_intermediate_results.csv', mode='a', header=not Path('more_intermediate_results.csv').exists(), index=False)
 
-def main(input_dir):
+""" def main(input_dir):
     if not isinstance(input_dir, Path):
         input_dir = Path(input_dir)
     results = []
 
     for seed_folder in input_dir.glob('seed*'):
-        subfolder = seed_folder / "robust~True" / "pool_size~4" / "doublet_rate~0.05" / "cell_count~1000"
+        subfolder = seed_folder / "robust~False" / "pool_size~4" / "doublet_rate~0.05" / "cell_count~1000"
         sample_assignment_path = subfolder /  "sample_assignment.yaml" 
         sample_identity_path = subfolder / "sample_identity.yaml" 
         
@@ -148,16 +158,17 @@ def main(input_dir):
                     # Periodically save results to a file to avoid memory burden
             if len(results) % 100 == 0:
                 temp_df = pd.DataFrame(results)
-                temp_df.to_csv('/cluster/work/bewi/members/jgawron/projects/Demultiplexing/Demultiplexing_simulations/workflow/sandbox/results_for_robust.csv', mode='a', header=False, index=False)
+                temp_df.to_csv('/cluster/work/bewi/members/jgawron/projects/Demultiplexing/Demultiplexing_simulations/workflow/sandbox/results_for_non_robust.csv', mode='a', header=False, index=False)
                 results.clear()
-
 
     # Save any remaining results
     if results:
         df = pd.DataFrame(results)
-        df.to_csv('/cluster/work/bewi/members/jgawron/projects/Demultiplexing/Demultiplexing_simulations/workflow/sandbox/results_for_robust.csv', mode='a', header=not Path('/cluster/work/bewi/members/jgawron/projects/Demultiplexing/Demultiplexing_simulations/workflow/sandbox/results_for_robust.csv').exists(), index=False)
-
+        df.to_csv('/cluster/work/bewi/members/jgawron/projects/Demultiplexing/Demultiplexing_simulations/workflow/sandbox/results_for_non_robust.csv', mode='a', header=not Path('/cluster/work/bewi/members/jgawron/projects/Demultiplexing/Demultiplexing_simulations/workflow/sandbox/results_for_non_robust.csv').exists(), index=False)
+ """
 
 if __name__ == '__main__':
     input_dir = Path('/cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output')# = args.input
+    
+    #process_simulation_run('/cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_4/robust~True/pool_size~4/doublet_rate~0.05/cell_count~1000')
     main(input_dir)

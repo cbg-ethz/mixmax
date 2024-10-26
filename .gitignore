@@ -1,8 +1,7 @@
-.snakemake
+*.snakemake
 slurm*
 .vscode
-tests
 !tests/test_*.py
 *__pycache__
-config/config_*
-._*
+*config/config_*
+*._*

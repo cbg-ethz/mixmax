@@ -12,6 +12,7 @@ sns.set_theme(style="whitegrid")
 
 data = data.loc[data['cell_count'].isin([1000, 2000, 3000, 4000])]
 
+data['score'] = 1-data['score']
 # Customize the appearance of the plots
 plt.rcParams.update({
     'axes.titlesize': 26,
@@ -39,6 +40,10 @@ plt.savefig("figure4a.png", dpi = 300)
 plt.close()
 
 
+data = pd.read_csv('results_for_robust.csv', header = 0)
+data.columns = ['seed', 'doublet_rate', 'cell_count', 'score', 'sample_identity_is_pathological', 'v_score']
+data['score'] = 1-data['score']
+data = data[data['score'] != 1] ### This outlier datapoint goes back to a mistake in the simulation! 
 plt.figure(figsize=(10, 8))
 plt.scatter(x='v_score', y='score', data = data, color = '#C97B84')
 
