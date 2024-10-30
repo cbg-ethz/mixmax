@@ -1,19 +1,22 @@
 include: Path("rules/common.smk")
 
+
 rule all:
     input:
-        output_files
-    
+        output_files,
+
 
 checkpoint get_input_samples:
     output:
-        samples_file = output_folder / "seed_{seed}" / "sample_list_{pool_size}.txt"
+        samples_file=output_folder / "seed_{seed}" / "sample_list_{pool_size}.txt",
     params:
-        number_of_samples = lambda wildcards: int(int(wildcards.pool_size)*(int(wildcards.pool_size) + 1)/2),
-        loom_file_path = loom_file_path,
-        seed = lambda w: w.seed,
+        number_of_samples=lambda wildcards: int(
+            int(wildcards.pool_size) * (int(wildcards.pool_size) + 1) / 2
+        ),
+        loom_file_path=loom_file_path,
+        seed=lambda w: w.seed,
     log:
-        output_folder / 'log' / 'generate_input_samples_{seed}_{pool_size}.log'
+        output_folder / "log" / "generate_input_samples_{seed}_{pool_size}.log",
     shell:
         """
         python {workflow.basedir}/scripts/get_input_samples.py \
@@ -24,19 +27,20 @@ checkpoint get_input_samples:
         &> {log}
         """
 
-rule split_files: ### This part of the pipeline is still not fully reproducible, because the files are split randomly. If I use the seed though, every file will be split the same way, which is not what I want.
+
+rule split_files:  ### This part of the pipeline is still not fully reproducible, because the files are split randomly. If I use the seed though, every file will be split the same way, which is not what I want.
     input:
-        loom_file_path / '{loom_file}.loom',
+        loom_file_path / "{loom_file}.loom",
     output:
-        split1 = output_folder / "seed_{seed}" / "loom" / '{loom_file}_split1.loom',
-        split2 = output_folder / "seed_{seed}" / "loom" / '{loom_file}_split2.loom',
+        split1=output_folder / "seed_{seed}" / "loom" / "{loom_file}_split1.loom",
+        split2=output_folder / "seed_{seed}" / "loom" / "{loom_file}_split2.loom",
     conda:
         "envs/loom.yml"
     resources:
         mem_mb_per_cpu=3000,
         runtime=90,
     log:
-        output_folder / "seed_{seed}" / 'log' / 'split_{loom_file}.log',
+        output_folder / "seed_{seed}" / "log" / "split_{loom_file}.log",
     shell:
         """
         python {workflow.basedir}/scripts/split_loom_files.py \
@@ -49,14 +53,19 @@ rule split_files: ### This part of the pipeline is still not fully reproducible,
 
 checkpoint create_demultiplexing_scheme:
     input:
-        sample_file = output_folder / "seed_{seed}" / 'sample_list_{pool_size}.txt'
+        sample_file=output_folder / "seed_{seed}" / "sample_list_{pool_size}.txt",
     output:
-        pools = output_folder / "seed_{seed}" / "pools_{pool_size}_robust{robust}.txt"
+        pools=output_folder / "seed_{seed}" / "pools_{pool_size}_robust{robust}.txt",
     params:
-        number_of_samples = lambda wildcards: int(int(wildcards.pool_size)*(int(wildcards.pool_size) + 1)/2),
-        input_dir = lambda w: output_folder / f"seed_{w.seed}" / "loom"
+        number_of_samples=lambda wildcards: int(
+            int(wildcards.pool_size) * (int(wildcards.pool_size) + 1) / 2
+        ),
+        input_dir=lambda w: output_folder / f"seed_{w.seed}" / "loom",
     log:
-        output_folder / "seed_{seed}" /  'log' / 'create_demultiplexing_scheme_{seed}_{pool_size}_robust{robust}.log'
+        output_folder
+        / "seed_{seed}"
+        / "log"
+        / "create_demultiplexing_scheme_{seed}_{pool_size}_robust{robust}.log",
     shell:
         """
         python {workflow.basedir}/scripts/create_demultiplexing_scheme.py \
@@ -70,16 +79,22 @@ checkpoint create_demultiplexing_scheme:
         """
 
 
-rule pooling: ##Need to introduce proper downsampling of cells
+rule pooling:  ##Need to introduce proper downsampling of cells
     input:
-        split_files = lambda w: yaml.safe_load(
+        split_files=lambda w: yaml.safe_load(
             open(
-                checkpoints.create_demultiplexing_scheme.get(seed=w.seed, pool_size = w.pool_size, robust = w.robust).output.pools
-                )
-            )[f"({w.pool_ID})"],
-        pool_data = output_folder / "seed_{seed}" / "pools_{pool_size}_robust{robust}.txt",
+                checkpoints.create_demultiplexing_scheme.get(
+                    seed=w.seed, pool_size=w.pool_size, robust=w.robust
+                ).output.pools
+            )
+        )[f"({w.pool_ID})"],
+        pool_data=output_folder / "seed_{seed}" / "pools_{pool_size}_robust{robust}.txt",
     output:
-        output_folder / "seed_{seed}" / paramspace.wildcard_pattern  / "pools" / "pool_{pool_ID}_{seed}.csv"
+        output_folder
+        / "seed_{seed}"
+        / paramspace.wildcard_pattern
+        / "pools"
+        / "pool_{pool_ID}_{seed}.csv",
     params:
         minGQ=config.get("mosaic", {}).get("minGQ", 30),
         minDP=config.get("mosaic", {}).get("minDP", 10),
@@ -91,15 +106,19 @@ rule pooling: ##Need to introduce proper downsampling of cells
         minHomVAF=config.get("mosaic", {}).get("minHomVAF", 0.95),
         minHetVAF=config.get("mosaic", {}).get("minHetVAF", 0.35),
         proximity=config.get("mosaic", {}).get("proximity", "25 50 100 200"),
-        ratios = lambda w, input: sample_mixing_ratios(w.seed, len(input.split_files)),
+        ratios=lambda w, input: sample_mixing_ratios(w.seed, len(input.split_files)),
     resources:
         mem_mb_per_cpu=10000,
         runtime=90,
     conda:
         "envs/mosaic.yml"
-    group: "demultiplexing_simulation"
+    group:
+        "demultiplexing_simulation"
     log:
-        output_folder / "seed_{seed}" / 'log' / 'pooling_{pool_ID}_{seed}_{doublet_rate}_{cell_count}_{pool_size}_robust{robust}.log'
+        output_folder
+        / "seed_{seed}"
+        / "log"
+        / "pooling_{pool_ID}_{seed}_{doublet_rate}_{cell_count}_{pool_size}_robust{robust}.log",
     shell:
         """
         python {workflow.basedir}/scripts/mosaic_processing.py \
@@ -124,29 +143,50 @@ rule pooling: ##Need to introduce proper downsampling of cells
 
 
 rule demultiplexing_demoTape:
-        input:
-            variants = output_folder /  "seed_{seed}" / paramspace.wildcard_pattern / "pools" / "pool_{pool_ID}_{seed}.csv",
-            pools = output_folder / "seed_{seed}" / "pools_{pool_size}_robust{robust}.txt",
-        output:
-            profiles = output_folder / "seed_{seed}" / paramspace.wildcard_pattern / 'demultiplexed' / 'pool_{pool_ID}_{seed}_demultiplexed.profiles.tsv',
-            assignments = output_folder / "seed_{seed}" / paramspace.wildcard_pattern / 'demultiplexed' / 'pool_{pool_ID}_{seed}_demultiplexed.assignments.tsv'
-        params:
-            cluster_number= lambda w, input: determine_number_of_different_donors(
-                checkpoints.create_demultiplexing_scheme.get(seed=w.seed, pool_size = w.pool_size, robust = w.robust).output.pools,
-                "({})".format(w.pool_ID)
-                ),
-            outbase = lambda w: output_folder / "seed_{}".format(w.seed) / paramspace.wildcard_pattern / 'demultiplexed' / "pool_{}_{}_demultiplexed".format(w.pool_ID, w.seed),
-            output_folder = output_folder
-        resources:
-            mem_mb_per_cpu=4096,
-            runtime=90,
-        conda:
-            "envs/sample_assignment.yml"
-        group: "demultiplexing_simulation"
-        log:
-            output_folder / 'log' / 'demultiplexing_{pool_ID}_{seed}_{doublet_rate}_{cell_count}_{pool_size}_robust{robust}.log',
-        shell:
-            """
+    input:
+        variants=output_folder
+        / "seed_{seed}"
+        / paramspace.wildcard_pattern
+        / "pools"
+        / "pool_{pool_ID}_{seed}.csv",
+        pools=output_folder / "seed_{seed}" / "pools_{pool_size}_robust{robust}.txt",
+    output:
+        profiles=output_folder
+        / "seed_{seed}"
+        / paramspace.wildcard_pattern
+        / "demultiplexed"
+        / "pool_{pool_ID}_{seed}_demultiplexed.profiles.tsv",
+        assignments=output_folder
+        / "seed_{seed}"
+        / paramspace.wildcard_pattern
+        / "demultiplexed"
+        / "pool_{pool_ID}_{seed}_demultiplexed.assignments.tsv",
+    params:
+        cluster_number=lambda w, input: determine_number_of_different_donors(
+            checkpoints.create_demultiplexing_scheme.get(
+                seed=w.seed, pool_size=w.pool_size, robust=w.robust
+            ).output.pools,
+            "({})".format(w.pool_ID),
+        ),
+        outbase=lambda w: output_folder
+        / "seed_{}".format(w.seed)
+        / paramspace.wildcard_pattern
+        / "demultiplexed"
+        / "pool_{}_{}_demultiplexed".format(w.pool_ID, w.seed),
+        output_folder=output_folder,
+    resources:
+        mem_mb_per_cpu=4096,
+        runtime=90,
+    conda:
+        "envs/sample_assignment.yml"
+    group:
+        "demultiplexing_simulation"
+    log:
+        output_folder
+        / "log"
+        / "demultiplexing_{pool_ID}_{seed}_{doublet_rate}_{cell_count}_{pool_size}_robust{robust}.log",
+    shell:
+        """
             python {workflow.basedir}/scripts/demultiplex_distance.py \
                 --input {input.variants} \
                 -n {params.cluster_number} \
@@ -156,20 +196,28 @@ rule demultiplexing_demoTape:
 
 
 rule label_samples:
-        input:
-            demultiplexing_assignments = lambda wildcards: get_all_demultiplexed_assignments(wildcards, paramspace.wildcard_pattern),
-        output:
-            output_folder / "seed_{seed}" / paramspace.wildcard_pattern / 'sample_identity.yaml',
-        resources:
-            mem_mb_per_cpu=4096,
-            runtime=90,
-        conda:
-            "envs/sample_assignment.yml"
-        group: "assess_simulation_results"
-        log:
-            output_folder / 'log' / 'label_samples.{seed}_{doublet_rate}_{cell_count}_{pool_size}_robust{robust}.log',
-        shell:
-            """
+    input:
+        demultiplexing_assignments=lambda wildcards: get_all_demultiplexed_assignments(
+            wildcards, paramspace.wildcard_pattern
+        ),
+    output:
+        output_folder
+        / "seed_{seed}"
+        / paramspace.wildcard_pattern
+        / "sample_identity.yaml",
+    resources:
+        mem_mb_per_cpu=4096,
+        runtime=90,
+    conda:
+        "envs/sample_assignment.yml"
+    group:
+        "assess_simulation_results"
+    log:
+        output_folder
+        / "log"
+        / "label_samples.{seed}_{doublet_rate}_{cell_count}_{pool_size}_robust{robust}.log",
+    shell:
+        """
             python {workflow.basedir}/scripts/assign_subsample_simulation.py \
                 --demultiplexing_assignment {input.demultiplexing_assignments} \
                 --output {output} \
@@ -178,17 +226,28 @@ rule label_samples:
 
 
 rule assign_samples:
-    input: 
-        demultiplexing_genotypes = lambda wildcards: get_all_demultiplexed_profiles(wildcards, paramspace.wildcard_pattern),
-        pools = output_folder / "seed_{seed}" / "pools_{pool_size}_robust{robust}.txt",
+    input:
+        demultiplexing_genotypes=lambda wildcards: get_all_demultiplexed_profiles(
+            wildcards, paramspace.wildcard_pattern
+        ),
+        pools=output_folder / "seed_{seed}" / "pools_{pool_size}_robust{robust}.txt",
     output:
-        sample_assignment = output_folder / "seed_{seed}" / paramspace.wildcard_pattern / 'sample_assignment.yaml',
-        heatmap = output_folder / "seed_{seed}" / paramspace.wildcard_pattern / 'sample_assignment_heatmap.png',
+        sample_assignment=output_folder
+        / "seed_{seed}"
+        / paramspace.wildcard_pattern
+        / "sample_assignment.yaml",
+        heatmap=output_folder
+        / "seed_{seed}"
+        / paramspace.wildcard_pattern
+        / "sample_assignment_heatmap.png",
     conda:
         "envs/sample_assignment.yml"
-    group: "assess_simulation_results"
+    group:
+        "assess_simulation_results"
     log:
-        output_folder / 'log' / 'assign_samples.{seed}_{doublet_rate}_{cell_count}_{pool_size}_robust{robust}.log',
+        output_folder
+        / "log"
+        / "assign_samples.{seed}_{doublet_rate}_{cell_count}_{pool_size}_robust{robust}.log",
     shell:
         """
         python {workflow.basedir}/scripts/compare_distances.py \

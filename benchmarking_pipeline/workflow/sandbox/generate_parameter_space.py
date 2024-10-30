@@ -8,7 +8,9 @@ pool_sizes = [4]
 robust_values = [True, False]
 
 # Generate all combinations of parameters
-combinations = list(itertools.product(robust_values, pool_sizes, doublet_rates, cell_counts))
+combinations = list(
+    itertools.product(robust_values, pool_sizes, doublet_rates, cell_counts)
+)
 
 # Define the output file path
 output_file = 'parameter_space.tsv'
@@ -22,4 +24,4 @@ with open(output_file, 'w', newline='') as tsvfile:
     for combination in combinations:
         writer.writerow(combination)
 
-print(f"Parameter space written to {output_file}")
+print(f'Parameter space written to {output_file}')

@@ -1,5 +1,4 @@
 import argparse
-import logging
 
 import pandas as pd
 import seaborn as sns
@@ -9,22 +8,25 @@ import yaml
 from pathlib import Path
 
 
-
 def pool_format2multiplexing_scheme(pool_scheme):
     demultiplexing_scheme = {}
     for pool, samples in pool_scheme.items():
         for sample in samples:
-            if "_split1.loom" in sample:
+            if '_split1.loom' in sample:
                 sample_name = str(Path(sample).stem)
                 sample_name = sample_name.replace('_split1', '')
-                number_of_iterations =pool.split('.')[1][:-1]
+                number_of_iterations = pool.split('.')[1][:-1]
                 pool_ID = pool.split('.')[0][1:]
                 if sample_name not in demultiplexing_scheme.keys():
-                    demultiplexing_scheme[sample_name] = [int(pool_ID), np.inf, int(number_of_iterations)]
+                    demultiplexing_scheme[sample_name] = [
+                        int(pool_ID),
+                        np.inf,
+                        int(number_of_iterations),
+                    ]
                 else:
                     demultiplexing_scheme[sample_name][0] = int(pool_ID)
                     demultiplexing_scheme[sample_name][2] = int(number_of_iterations)
-            if "_split2.loom" in sample:
+            if '_split2.loom' in sample:
                 sample_name = str(Path(sample).stem)
                 sample_name = sample_name.replace('_split2', '')
                 pool_ID = pool.split('.')[0][1:]
@@ -33,25 +35,32 @@ def pool_format2multiplexing_scheme(pool_scheme):
                 else:
                     demultiplexing_scheme[sample_name][1] = int(pool_ID)
             # Swap keys and items in the dictionary
-    swapped_demultiplexing_scheme = {tuple(v): k for k, v in demultiplexing_scheme.items()}
-    
+    swapped_demultiplexing_scheme = {
+        tuple(v): k for k, v in demultiplexing_scheme.items()
+    }
+
     return swapped_demultiplexing_scheme
 
 
-
-
 # Create a custom colormap
-cmap = sns.color_palette("viridis", as_cmap=True)
+cmap = sns.color_palette('viridis', as_cmap=True)
 cmap.set_bad(color='grey')
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Compare distances between samples")
-    parser.add_argument("--tsv_files", nargs='+' , type=str, help="Path to TSV files containing the genotypes of the clusters. Must be in the same order as the pools in the pooling scheme.")
-    parser.add_argument("--pool_scheme", type=str, help="Path to the pool scheme file")
-    parser.add_argument("--output_plot", type=str, help="Output heatmap")
-    parser.add_argument("--output", type=str, help="sample assignment")
-    parser.add_argument("--robust", type=bool, required=False, default = False, help="Robust assignment")
+    parser = argparse.ArgumentParser(description='Compare distances between samples')
+    parser.add_argument(
+        '--tsv_files',
+        nargs='+',
+        type=str,
+        help='Path to TSV files containing the genotypes of the clusters. Must be in the same order as the pools in the pooling scheme.',
+    )
+    parser.add_argument('--pool_scheme', type=str, help='Path to the pool scheme file')
+    parser.add_argument('--output_plot', type=str, help='Output heatmap')
+    parser.add_argument('--output', type=str, help='sample assignment')
+    parser.add_argument(
+        '--robust', type=bool, required=False, default=False, help='Robust assignment'
+    )
     return parser.parse_args()
 
 
@@ -72,19 +81,30 @@ def compute_ratio(matrix):
 
 def permute_tsv_files(tsv_files, pool_scheme):
     pools = [f"({Path(file).name.split("_")[1]})" for file in tsv_files]
-    
+
     pool_scheme_keys = list(pool_scheme.keys())
     pool_permutation = [pools.index(pool) for pool in pool_scheme_keys]
-    
-    if not all((pool1 == pool2 for pool1, pool2 in zip([pools[permuted_idx] for permuted_idx in pool_permutation], pool_scheme_keys))):
-        raise ValueError("The pools in the pool scheme do not match the pools in the TSV files")
+
+    if not all(
+        (
+            pool1 == pool2
+            for pool1, pool2 in zip(
+                [pools[permuted_idx] for permuted_idx in pool_permutation],
+                pool_scheme_keys,
+            )
+        )
+    ):
+        raise ValueError(
+            'The pools in the pool scheme do not match the pools in the TSV files'
+        )
 
     return pool_permutation
 
+
 args = parse_args()
 
-def load_data(args):
 
+def load_data(args):
     with open(args.pool_scheme, 'r') as file:
         pooling_scheme = yaml.safe_load(file)
 
@@ -94,10 +114,11 @@ def load_data(args):
         tsv_files = [args.tsv_files]
     tsv_files = list(args.tsv_files)
     tsv_files_permuted = [tsv_files[i] for i in permutation_of_pools]
-    
-    dfs = [pd.read_csv(f, sep='\t', index_col = 0) for f in tsv_files_permuted]
+
+    dfs = [pd.read_csv(f, sep='\t', index_col=0) for f in tsv_files_permuted]
 
     return dfs, pooling_scheme
+
 
 dfs, pooling_scheme = load_data(args)
 
@@ -109,14 +130,14 @@ for df in dfs:
 print(all_columns)
 
 
-for idx,df in enumerate(dfs):
+for idx, df in enumerate(dfs):
     for col in all_columns:
         if col not in df.columns:
             dfs[idx][col] = np.nan
 
-for idx,df in enumerate(dfs):
+for idx, df in enumerate(dfs):
     dfs[idx] = df[sorted(all_columns)]
-    
+
 # Concatenate all DataFrames
 concatenated_df = pd.concat(dfs, ignore_index=True)[sorted(all_columns)]
 
@@ -135,7 +156,7 @@ cols_to_remove_45_55 = concatenated_df.columns[
 concatenated_df.drop(columns=cols_to_remove, inplace=True)
 concatenated_df.drop(columns=cols_to_remove_45_55, inplace=True)
 
-for idx,df in enumerate(dfs):
+for idx, df in enumerate(dfs):
     dfs[idx] = df.drop(columns=cols_to_remove, inplace=False)
     dfs[idx] = df.drop(columns=cols_to_remove_45_55, inplace=False)
 
@@ -151,7 +172,7 @@ for df in dfs:
 # Compute the distance matrix considering only non-NaN entries and normalizing
 
 
-    # Compute the distance matrix for all pairs of DataFrames
+# Compute the distance matrix for all pairs of DataFrames
 
 distance_matrices = np.empty((len(dfs), len(dfs)), dtype=object)
 for data1, df1 in enumerate(dfs):
@@ -159,7 +180,9 @@ for data1, df1 in enumerate(dfs):
         distance_matrix = np.zeros((df1.shape[0], df2.shape[0]))
         for i in range(df1.shape[0]):
             for j in range(df2.shape[0]):
-                distance_matrix[i, j] = custom_distance(df1.iloc[i].values, df2.iloc[j].values)
+                distance_matrix[i, j] = custom_distance(
+                    df1.iloc[i].values, df2.iloc[j].values
+                )
         distance_matrices[data1, data2] = distance_matrix
 
 
@@ -200,16 +223,12 @@ genotype_plot = heatmap_plot.parent / 'genotype_heatmap.png'
 plt.savefig(heatmap_plot)
 
 
-
 fig, axes = plt.subplots(nrows=1, ncols=len(dfs), figsize=(15, 5))
 
 for i, df in enumerate(dfs):
     sns.heatmap(df.fillna(0), ax=axes[i], cmap=cmap, cbar=False)
     axes[i].set_title(f'Pool {i}')
 plt.savefig(genotype_plot)
-
-
-
 
 
 ratios = []
@@ -224,7 +243,7 @@ sorted_ratios = sorted(ratios, key=lambda x: x[2], reverse=True)
 lowest_value_pairs = []
 
 
-used_samples = [[]*len(dfs) for _ in range(len(dfs))]
+used_samples = [[] * len(dfs) for _ in range(len(dfs))]
 """ if remove is not None:
     for j in range(len(dfs)):
         if j != remove:
@@ -272,27 +291,31 @@ for i, j, _ in sorted_ratios:
         # Sort the distance matrices by the recomputed ratio, from largest to smallest
         sorted_ratios = sorted(ratios, key=lambda x: x[2], reverse=True)
     else:
-        print(f"skipping assignment in matrix {i},{j}")
+        print(f'skipping assignment in matrix {i},{j}')
 
 # Print the pairs with the lowest values
 for i, j, row, col in lowest_value_pairs:
-    print(f'Lowest value in Distance Matrix DF{i} vs DF{j}: Row = {row}, Column = {col}')
+    print(
+        f'Lowest value in Distance Matrix DF{i} vs DF{j}: Row = {row}, Column = {col}'
+    )
 
 
-
-demultiplexing_scheme = pool_format2multiplexing_scheme(pooling_scheme)    
+demultiplexing_scheme = pool_format2multiplexing_scheme(pooling_scheme)
 
 for i, j, row, col in lowest_value_pairs:
     if i > j:
         i, j = j, i
         row, col = col, row
-    print(f'Sample {row} from pool {i} and sample {col} from pool {j}: {demultiplexing_scheme[(i,j,0)]}')
+    print(
+        f'Sample {row} from pool {i} and sample {col} from pool {j}: {demultiplexing_scheme[(i,j,0)]}'
+    )
 
-if args.robust == False: 
+if args.robust:
     for i in range(len(used_samples)):
-        unused_sample = next(sample for sample in range(len(dfs[i])) if sample not in used_samples[i])
-        print(f"Sample {unused_sample} from pool {i}: {demultiplexing_scheme[(i,i,0)]}")
-
+        unused_sample = next(
+            sample for sample in range(len(dfs[i])) if sample not in used_samples[i]
+        )
+        print(f'Sample {unused_sample} from pool {i}: {demultiplexing_scheme[(i,i,0)]}')
 
 
 pooling_scheme_keys = list(pooling_scheme.keys())
@@ -302,21 +325,35 @@ for i, j, row, col in lowest_value_pairs:
         i, j = j, i
         row, col = col, row
     if pooling_scheme_keys[i] not in sample_assignment.keys():
-        sample_assignment[pooling_scheme_keys[i]] = {row: demultiplexing_scheme[(i, j, 0)]}
+        sample_assignment[pooling_scheme_keys[i]] = {
+            row: demultiplexing_scheme[(i, j, 0)]
+        }
     else:
-        sample_assignment[pooling_scheme_keys[i]][row] = demultiplexing_scheme[(i, j, 0)]
+        sample_assignment[pooling_scheme_keys[i]][row] = demultiplexing_scheme[
+            (i, j, 0)
+        ]
     if pooling_scheme_keys[j] not in sample_assignment.keys():
-        sample_assignment[pooling_scheme_keys[j]] = {col: demultiplexing_scheme[(i, j, 0)]}
+        sample_assignment[pooling_scheme_keys[j]] = {
+            col: demultiplexing_scheme[(i, j, 0)]
+        }
     else:
-        sample_assignment[pooling_scheme_keys[j]][col] = demultiplexing_scheme[(i, j, 0)]
+        sample_assignment[pooling_scheme_keys[j]][col] = demultiplexing_scheme[
+            (i, j, 0)
+        ]
 
-if args.robust == False: 
+if args.robust:
     for i in range(len(used_samples)):
-        unused_sample = next(sample for sample in range(len(dfs[i])) if sample not in used_samples[i])
+        unused_sample = next(
+            sample for sample in range(len(dfs[i])) if sample not in used_samples[i]
+        )
         if pooling_scheme_keys[i] not in sample_assignment.keys():
-            sample_assignment[pooling_scheme_keys[i]] = {unused_sample: demultiplexing_scheme[(i, i, 0)]}
+            sample_assignment[pooling_scheme_keys[i]] = {
+                unused_sample: demultiplexing_scheme[(i, i, 0)]
+            }
         else:
-            sample_assignment[pooling_scheme_keys[i]][unused_sample] = demultiplexing_scheme[(i, i, 0)]
+            sample_assignment[pooling_scheme_keys[i]][unused_sample] = (
+                demultiplexing_scheme[(i, i, 0)]
+            )
 
 with open(args.output, 'w') as yaml_file:
     yaml.dump(sample_assignment, yaml_file)

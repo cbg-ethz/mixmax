@@ -3,7 +3,6 @@
 import argparse
 from itertools import combinations
 import os
-import re
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -104,30 +103,30 @@ class demoTape:
         partial_order = {}
         for cell in df.columns:
             if '+' in cell:
-                s1 = cell.split('+')[0].split("_")[1]
-                s2 = cell.split('+')[1].split("_")[1]
+                s1 = cell.split('+')[0].split('_')[1]
+                s2 = cell.split('+')[1].split('_')[1]
                 # Create a dictionary to store partial orders
                 if s2 in partial_order.keys():
-                    if s1 in partial_order[s2]: ## This means s2<s1
-                        s2,s1 = s1,s2
-                elif not s1 in partial_order.keys():
-                        partial_order[s1] = [s2]
-                elif not s2 in partial_order[s1]:
+                    if s1 in partial_order[s2]:  ## This means s2<s1
+                        s2, s1 = s1, s2
+                elif s1 not in partial_order.keys():
+                    partial_order[s1] = [s2]
+                elif s2 not in partial_order[s1]:
                     partial_order[s1].append(s2)
 
                 true_cl.append('+'.join([s1, s2]))
             else:
-                s1 = cell.split("_")[1]
+                s1 = cell.split('_')[1]
                 true_cl.append(s1)
-            #if 'pat' in cell:
+            # if 'pat' in cell:
             #    s1 = int(re.split(r'[\.,]', cell.split('+')[0])[-1][3:])
-            #else:
+            # else:
             #    s1 = 0
 
-            #if '+' in cell:
+            # if '+' in cell:
             #   s2 = int(re.split(r'[\.,]', cell.split('+')[1])[-1][3:])
             #    true_cl.append('+'.join([str(j) for j in sorted([s1, s2])]))
-            #else:
+            # else:
             #    true_cl.append(s1)
         self.true_cl = np.array(true_cl)
 
@@ -169,13 +168,11 @@ class demoTape:
 
     def demultiplex(self):
         self.init_dendrogram()
-        #self.identify_doublets()
+        # self.identify_doublets()
         self.set_assignment(self.sgt_cl_no)
-        self.sgt_ids = np.array(
-            [i for i in np.unique(self.assignment)]
-        )
+        self.sgt_ids = np.array([i for i in np.unique(self.assignment)])
         self.delete_garbage_cluster()
-        #self.merge_surplus_singlets()
+        # self.merge_surplus_singlets()
 
     # -------------------------------- DENDROGRAM ----------------------------------
 
@@ -970,7 +967,7 @@ def main(args):
 
     for in_file in in_files:
         if args.metric == 'reads':
-            dt = demoTape_reads(in_file, args.clusters+1)
+            dt = demoTape_reads(in_file, args.clusters + 1)
         else:
             dt = demoTape_gt(in_file, args.clusters, args.metric)
 

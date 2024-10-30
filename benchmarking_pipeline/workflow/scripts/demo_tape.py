@@ -17,20 +17,57 @@ from seaborn import clustermap
 
 EPSILON = np.finfo(np.float64).resolution
 
-COLORS = ['#e41a1c', '#377eb8', '#4daf4a', '#E4761A' , '#2FBF85'] # '#A4CA55'
-COLORS = ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c', '#fb9a99', '#e31a1c',
-    '#fdbf6f', '#ff7f00', '#cab2d6', '#6a3d9a', '#ffff99', '#b15928']
+COLORS = ['#e41a1c', '#377eb8', '#4daf4a', '#E4761A', '#2FBF85']  # '#A4CA55'
+COLORS = [
+    '#a6cee3',
+    '#1f78b4',
+    '#b2df8a',
+    '#33a02c',
+    '#fb9a99',
+    '#e31a1c',
+    '#fdbf6f',
+    '#ff7f00',
+    '#cab2d6',
+    '#6a3d9a',
+    '#ffff99',
+    '#b15928',
+]
 
-COLORS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000']
+COLORS = [
+    '#e6194b',
+    '#3cb44b',
+    '#ffe119',
+    '#4363d8',
+    '#f58231',
+    '#911eb4',
+    '#46f0f0',
+    '#f032e6',
+    '#bcf60c',
+    '#fabebe',
+    '#008080',
+    '#e6beff',
+    '#9a6324',
+    '#fffac8',
+    '#800000',
+    '#aaffc3',
+    '#808000',
+    '#ffd8b1',
+    '#000075',
+    '#808080',
+    '#ffffff',
+    '#000000',
+]
 COLORS_STR = ['red', 'blue', 'green', 'orange', 'mint']
 
 
 FILE_EXT = 'png'
 FONTSIZE = 30
 DPI = 300
-sns.set_style('whitegrid') #darkgrid, whitegrid, dark, white, ticks
-sns.set_context('paper',
-    rc={'lines.linewidth': 2,
+sns.set_style('whitegrid')  # darkgrid, whitegrid, dark, white, ticks
+sns.set_context(
+    'paper',
+    rc={
+        'lines.linewidth': 2,
         'axes.axisbelow': True,
         'font.size': FONTSIZE,
         'axes.labelsize': 'medium',
@@ -39,8 +76,9 @@ sns.set_context('paper',
         'ytick.labelsize': 'medium',
         'legend.fontsize': 'medium',
         'legend.title_fontsize': 'large',
-        'axes.labelticksize': 50
-})
+        'axes.labelticksize': 50,
+    },
+)
 plt.rcParams['xtick.major.size'] = 5
 plt.rcParams['xtick.major.width'] = 1.5
 plt.rcParams['xtick.bottom'] = True
@@ -54,8 +92,8 @@ class demoTape:
         # Get full data
         df = pd.read_csv(in_file, index_col=[0, 1], dtype={'CHR': str})
         self.SNPs = df.apply(
-            lambda x: f'chr{x.name[0]}:{x.name[1]} {x["REF"]}>{x["ALT"]}',
-            axis=1)
+            lambda x: f'chr{x.name[0]}:{x.name[1]} {x["REF"]}>{x["ALT"]}', axis=1
+        )
         df.drop(['REF', 'ALT', 'REGION', 'NAME', 'FREQ'], axis=1, inplace=True)
         self.cells = df.columns.values
 
@@ -78,11 +116,13 @@ class demoTape:
         self.ref = df.applymap(lambda x: int(x.split(':')[0])).values.T
         self.alt = df.applymap(lambda x: int(x.split(':')[1])).values.T
         self.dp = self.ref + self.alt
-        self.VAF = np.clip(np.where(self.dp > 0, self.alt / self.dp, np.nan),
-            EPSILON, 1 - EPSILON)
+        self.VAF = np.clip(
+            np.where(self.dp > 0, self.alt / self.dp, np.nan), EPSILON, 1 - EPSILON
+        )
         self.RAF = 1 - self.VAF
-        self.norm_const = np.arange(self.dp.max() * 2 + 1) \
-            * np.log(np.arange(self.dp.max() * 2 + 1))
+        self.norm_const = np.arange(self.dp.max() * 2 + 1) * np.log(
+            np.arange(self.dp.max() * 2 + 1)
+        )
         self.reads = np.hstack([self.ref, self.alt, self.dp])
 
         self.metric = self.dist_reads
@@ -95,16 +135,16 @@ class demoTape:
         self.dbt_ids = np.array([])
         self.dbt_map = {}
 
-
     def __str__(self):
-        out_str = '\ndemoTape:\n' \
-            f'\tFile: {self.in_file}\n' \
-            f'\t# Samples: {self.cl_no}\n' \
-            f'\tCells: {self.cells}:\n' \
-            f'\tSNPs: {self.SNPs}\n' \
+        out_str = (
+            '\ndemoTape:\n'
+            f'\tFile: {self.in_file}\n'
+            f'\t# Samples: {self.cl_no}\n'
+            f'\tCells: {self.cells}:\n'
+            f'\tSNPs: {self.SNPs}\n'
             f'\tDistance metric: reads'
+        )
         return out_str
-
 
     @staticmethod
     def dist_reads(c1, c2):
@@ -112,8 +152,8 @@ class demoTape:
         r2 = np.reshape(c2, (3, -1))
 
         valid = (r1[2] > 0) & (r2[2] > 0)
-        r1 = r1[:,valid]
-        r2 = r2[:,valid]
+        r1 = r1[:, valid]
+        r2 = r2[:, valid]
 
         p1 = np.clip(r1[0] / r1[2], EPSILON, 1 - EPSILON)
         p2 = np.clip(r2[0] / r2[2], EPSILON, 1 - EPSILON)
@@ -121,49 +161,59 @@ class demoTape:
         p12 = np.clip((r1[0] + r2[0]) / (dp_total), EPSILON, 1 - EPSILON)
         p12_inv = 1 - p12
 
-        logl = r1[0] * np.log(p1 / p12) + r1[1] * np.log((1 - p1) / p12_inv) \
-            + r2[0] * np.log(p2 / p12) + r2[1] * np.log((1 - p2) / p12_inv)
+        logl = (
+            r1[0] * np.log(p1 / p12)
+            + r1[1] * np.log((1 - p1) / p12_inv)
+            + r2[0] * np.log(p2 / p12)
+            + r2[1] * np.log((1 - p2) / p12_inv)
+        )
 
-        norm = np.log(dp_total) * (dp_total) \
-            - r1[2] * np.log(r1[2]) - r2[2] * np.log(r2[2])
+        norm = (
+            np.log(dp_total) * (dp_total)
+            - r1[2] * np.log(r1[2])
+            - r2[2] * np.log(r2[2])
+        )
 
         return np.sum(logl / norm) / valid.sum()
-
 
     def get_pairwise_dists(self):
         dist = []
         for i in np.arange(self.cells.size - 1):
-            valid = (self.dp[i] > 0) & (self.dp[i+1:] > 0)
-            dp_total = self.dp[i] + self.dp[i+1:]
-            p12 = np.clip((self.alt[i] + self.alt[i+1:]) / dp_total, EPSILON, 1 - EPSILON)
+            valid = (self.dp[i] > 0) & (self.dp[i + 1 :] > 0)
+            dp_total = self.dp[i] + self.dp[i + 1 :]
+            p12 = np.clip(
+                (self.alt[i] + self.alt[i + 1 :]) / dp_total, EPSILON, 1 - EPSILON
+            )
             p12_inv = 1 - p12
 
-            logl = self.alt[i] * np.log(self.VAF[i] / p12) \
-                + self.ref[i] * np.log(self.RAF[i] / p12_inv) \
-                + self.alt[i+1:] * np.log(self.VAF[i+1:] / p12) \
-                + self.ref[i+1:] * np.log(self.RAF[i+1:] / p12_inv)
+            logl = (
+                self.alt[i] * np.log(self.VAF[i] / p12)
+                + self.ref[i] * np.log(self.RAF[i] / p12_inv)
+                + self.alt[i + 1 :] * np.log(self.VAF[i + 1 :] / p12)
+                + self.ref[i + 1 :] * np.log(self.RAF[i + 1 :] / p12_inv)
+            )
 
-            norm = self.norm_const[dp_total] \
-                - self.norm_const[self.dp[i]] - self.norm_const[self.dp[i+1:]]
+            norm = (
+                self.norm_const[dp_total]
+                - self.norm_const[self.dp[i]]
+                - self.norm_const[self.dp[i + 1 :]]
+            )
 
             dist.append(np.nansum(logl / norm, axis=1) / valid.sum(axis=1))
         return np.concatenate(dist)
-
 
     def demultiplex(self):
         self.init_dendrogram()
         self.identify_doublets()
         self.merge_surplus_singlets()
 
-
-# -------------------------------- DENDROGRAM ----------------------------------
+    # -------------------------------- DENDROGRAM ----------------------------------
 
     def init_dendrogram(self):
         dist = self.get_pairwise_dists()
         self.Z = linkage(dist, method='ward')
 
-
-# ---------------------------- IDENTIFY DOUBLETS -------------------------------
+    # ---------------------------- IDENTIFY DOUBLETS -------------------------------
 
     def identify_doublets(self):
         cl_no = self.sgt_cl_no + self.dbt_cl_no
@@ -175,13 +225,12 @@ class demoTape:
             if self.dbt_ids.size == self.dbt_cl_no:
                 break
             elif cl_no == (self.sgt_cl_no + self.dbt_cl_no) * 3:
-                print(f'Could not identify all doublets.')
+                print('Could not identify all doublets.')
                 self.set_assigment(self.sgt_cl_no + self.dbt_cl_no)
                 self.set_dbt_ids()
                 break
             cl_no += 1
             print(f'Increasing cuttree clusters to {cl_no}')
-
 
     def set_assigment(self, cl_no):
         self.assignment = cut_tree(self.Z, n_clusters=cl_no).flatten()
@@ -190,19 +239,16 @@ class demoTape:
         for cl_id, cl in enumerate(clusters):
             self.profiles[cl_id] = self.get_profile(cl)
 
-
     def get_profile(self, cl):
         cells = np.isin(self.assignment, cl)
-        p = np.average(np.nan_to_num(self.VAF[cells]), weights=self.dp[cells],
-            axis=0)
+        p = np.average(np.nan_to_num(self.VAF[cells]), weights=self.dp[cells], axis=0)
         dp = np.mean(self.dp[cells], axis=0).round()
         alt = (dp * p).round()
         ref = dp - alt
         return np.hstack([alt, ref, dp])
 
-
     def set_dbt_ids(self):
-        cl_size  = np.unique(self.assignment, return_counts=True)[1] / self.cells.size
+        cl_size = np.unique(self.assignment, return_counts=True)[1] / self.cells.size
         cl_no = cl_size.size
 
         dbt_map = {}
@@ -217,8 +263,9 @@ class demoTape:
 
         df_dbt = pd.DataFrame([], columns=dbt_combs, index=range(cl_no))
         for i in range(cl_no):
-            df_dbt.loc[i] = np.apply_along_axis(self.metric, 1, dbt_profiles,
-                self.profiles[i])
+            df_dbt.loc[i] = np.apply_along_axis(
+                self.metric, 1, dbt_profiles, self.profiles[i]
+            )
             for j in dbt_combs:
                 # set doublet combo dist to np.nan if:
                 # 1. Singlet is included in Dbt cluster
@@ -254,26 +301,28 @@ class demoTape:
             df_dbt.drop(rm_rows, axis=0, inplace=True, errors='ignore')
             # Remove doublet rows including cluster
             rm_cols = [dbt_id] + [i for i in dbt_combs if cl_id in i]
-            df_dbt.drop(rm_cols, axis=1, inplace=True, errors='ignore') # Ignore error on already dropped labels
+            df_dbt.drop(
+                rm_cols, axis=1, inplace=True, errors='ignore'
+            )  # Ignore error on already dropped labels
 
-        self.sgt_ids = np.array([i for i in np.unique(self.assignment) \
-            if not i in dbt_ids])
+        self.sgt_ids = np.array(
+            [i for i in np.unique(self.assignment) if i not in dbt_ids]
+        )
         self.dbt_ids = np.array(dbt_ids)
         self.dbt_map = dbt_map
 
         # self.plot_heatmap()
         # import pdb; pdb.set_trace()
 
-
     def check_hom_match(self, scl, dcl):
-        rs =  np.reshape(self.profiles[scl], (3, -1))
+        rs = np.reshape(self.profiles[scl], (3, -1))
         rd1 = np.reshape(self.profiles[dcl[0]], (3, -1))
         rd2 = np.reshape(self.profiles[dcl[1]], (3, -1))
 
         valid = (rs[2] > 0) & (rd1[2] > 0) & (rd2[2] > 0)
-        rs = rs[:,valid]
-        rd1 = rd1[:,valid]
-        rd2 = rd2[:,valid]
+        rs = rs[:, valid]
+        rd1 = rd1[:, valid]
+        rd2 = rd2[:, valid]
 
         ps = rs[0] / rs[2]
         pd1 = rd1[0] / rd1[2]
@@ -318,7 +367,6 @@ class demoTape:
 
         return (~hom_match).sum()
 
-
     def get_cl_map(self):
         if self.sgt_ids.size == 0:
             cl_map = {i: str(i) for i in np.unique(self.assignment)}
@@ -334,8 +382,7 @@ class demoTape:
                 assignment_str[i] = cl_map[j]
         return cl_map, assignment_str
 
-
-# ------------------------- MERGE SURPLUS SINGLETS -----------------------------
+    # ------------------------- MERGE SURPLUS SINGLETS -----------------------------
 
     def merge_surplus_singlets(self):
         # Merge surplus single clusters
@@ -391,8 +438,9 @@ class demoTape:
 
                 self.assignment[self.assignment == rem_dbt_cl] = cl1
                 self.assignment[self.assignment > rem_dbt_cl] -= 1
-                self.dbt_ids = np.delete(self.dbt_ids,
-                    np.argwhere(self.dbt_ids == rem_dbt_cl))
+                self.dbt_ids = np.delete(
+                    self.dbt_ids, np.argwhere(self.dbt_ids == rem_dbt_cl)
+                )
                 self.sgt_ids[self.sgt_ids > rem_dbt_cl] -= 1
                 self.dbt_ids[self.dbt_ids > rem_dbt_cl] -= 1
 
@@ -400,13 +448,17 @@ class demoTape:
 
             if len(self.dbt_map.values()) != len(set(self.dbt_map.values())):
                 print('Removing 1 equal doublet cluster')
-                eq_dbt = [i for i,j in self.dbt_map.items() \
-                    if list(self.dbt_map.values()).count(j) > 1]
+                eq_dbt = [
+                    i
+                    for i, j in self.dbt_map.items()
+                    if list(self.dbt_map.values()).count(j) > 1
+                ]
 
                 self.assignment[self.assignment == eq_dbt[1]] = eq_dbt[0]
                 self.assignment[self.assignment > eq_dbt[1]] -= 1
-                self.dbt_ids = np.delete(self.dbt_ids,
-                    np.argwhere(self.dbt_ids == eq_dbt[1]))
+                self.dbt_ids = np.delete(
+                    self.dbt_ids, np.argwhere(self.dbt_ids == eq_dbt[1])
+                )
                 self.sgt_ids[self.sgt_ids > eq_dbt[1]] -= 1
                 self.dbt_ids[self.dbt_ids > eq_dbt[1]] -= 1
 
@@ -418,15 +470,14 @@ class demoTape:
             # Update profile
             self.profiles[cl1] = self.get_profile(cl1)
 
-
     def get_sgt_dist_matrix(self):
         mat = np.zeros((self.sgt_ids.size, self.sgt_ids.size))
         for i, j in enumerate(self.sgt_ids):
-            mat[i] = np.apply_along_axis(self.metric, 1,
-                self.profiles[self.sgt_ids], self.profiles[j])
+            mat[i] = np.apply_along_axis(
+                self.metric, 1, self.profiles[self.sgt_ids], self.profiles[j]
+            )
         mat[np.tril_indices(self.sgt_ids.size)] = np.nan
         return mat
-
 
     def update_dbt_map(self, new_cl, del_cl):
         dbt_map_new = {}
@@ -454,41 +505,38 @@ class demoTape:
 
         return dbt_map_new, consistent
 
-
     # ------------------------ HEATMAP GENERATION ------------------------------
 
     @staticmethod
     def get_cmap():
         # Edit this gradient at https://eltos.github.io/gradient/
-        cmap = LinearSegmentedColormap.from_list('my_gradient', (
-            (0.000, (1.000, 1.000, 1.000)),
-            (0.167, (1.000, 0.882, 0.710)),
-            (0.333, (1.000, 0.812, 0.525)),
-            (0.500, (1.000, 0.616, 0.000)),
-            (0.667, (1.000, 0.765, 0.518)),
-            (0.833, (1.000, 0.525, 0.494)),
-            (1.000, (1.000, 0.000, 0.000)))
+        cmap = LinearSegmentedColormap.from_list(
+            'my_gradient',
+            (
+                (0.000, (1.000, 1.000, 1.000)),
+                (0.167, (1.000, 0.882, 0.710)),
+                (0.333, (1.000, 0.812, 0.525)),
+                (0.500, (1.000, 0.616, 0.000)),
+                (0.667, (1.000, 0.765, 0.518)),
+                (0.833, (1.000, 0.525, 0.494)),
+                (1.000, (1.000, 0.000, 0.000)),
+            ),
         )
         return cmap
 
-
     def get_hm_data(self):
-        df =  np.nan_to_num(self.VAF, nan=-1)
+        df = np.nan_to_num(self.VAF, nan=-1)
         mask = np.zeros(self.VAF.shape, dtype=bool)
         mask[self.dp == 0] = True
         return df, mask
 
-
     @staticmethod
     def get_hm_specifics():
-        return {'vmin': 0, 'vmax': 1,
-            'cbar_kws': {'ticks': [0, 1], 'label': 'VAF'}}
-
+        return {'vmin': 0, 'vmax': 1, 'cbar_kws': {'ticks': [0, 1], 'label': 'VAF'}}
 
     @staticmethod
     def apply_cm_specifics(cm):
         pass
-
 
     def plot_heatmap(self, out_file='', cluster=True):
         cmap = self.get_cmap()
@@ -536,10 +584,11 @@ class demoTape:
                 cmap=cmap,
                 figsize=(25, 10),
                 xticklabels=self.SNPs,
-                cbar_kws={'ticks': [0, 1], 'label': 'VAF'}
+                cbar_kws={'ticks': [0, 1], 'label': 'VAF'},
             )
         except tk.TclError:
             import matplotlib
+
             matplotlib.use('Agg')
             cm = clustermap(
                 df_plot,
@@ -547,12 +596,13 @@ class demoTape:
                 row_cluster=cluster,
                 col_cluster=cluster,
                 mask=mask,
-                vmin=0, vmax=1,
+                vmin=0,
+                vmax=1,
                 row_colors=r_colors,
                 cmap=cmap,
                 figsize=(25, 10),
                 xticklabels=self.SNPs,
-                cbar_kws={'ticks': [0, 1], 'label': 'VAF'}
+                cbar_kws={'ticks': [0, 1], 'label': 'VAF'},
             )
 
         cm.ax_heatmap.set_facecolor('#5B566C')
@@ -561,8 +611,13 @@ class demoTape:
             cm.ax_heatmap.set_yticks([])
         cm.ax_heatmap.set_xlabel('SNPs')
 
-        cm.ax_heatmap.set_xticklabels(cm.ax_heatmap.get_xticklabels(),
-            rotation=45, fontsize=5, ha='right', va='top')
+        cm.ax_heatmap.set_xticklabels(
+            cm.ax_heatmap.get_xticklabels(),
+            rotation=45,
+            fontsize=5,
+            ha='right',
+            va='top',
+        )
 
         cm.ax_col_dendrogram.set_visible(False)
         self.apply_cm_specifics(cm)
@@ -573,7 +628,6 @@ class demoTape:
             cm.fig.savefig(out_file, dpi=DPI)
         else:
             plt.show()
-
 
     # -------------------------- GENERATE OUTPUT -------------------------------
 
@@ -590,10 +644,10 @@ class demoTape:
 
         # Safe SNV profiles to identy patients
         VAF_df = self.get_VAF_profile(self.sgt_ids)
-        VAF_df.index = [f'{cl_map[i]} ({COLORS_STR[int(cl_map[i])]})' \
-            for i in self.sgt_ids]
+        VAF_df.index = [
+            f'{cl_map[i]} ({COLORS_STR[int(cl_map[i])]})' for i in self.sgt_ids
+        ]
         VAF_df.round(2).to_csv(f'{output}.profiles.tsv', sep='\t')
-
 
     def get_VAF_profile(self, cl):
         reads_all = np.reshape(self.profiles[cl], (cl.size, 3, self.SNPs.size))
@@ -601,7 +655,6 @@ class demoTape:
         for reads_cl in reads_all:
             VAF_raw.append(reads_cl[0] / reads_cl[2])
         return pd.DataFrame(VAF_raw, index=cl, columns=self.SNPs)
-
 
     def print_summary(self, cl_map):
         GTs = {'WT': (0, 0.35), 'HET': (0.35, 0.95), 'HOM': (0.95, 1)}
@@ -612,8 +665,10 @@ class demoTape:
                 cl_color = f'{COLORS_STR[cl1]}+{COLORS_STR[cl2]}'
             else:
                 cl_color = COLORS_STR[int(cl_name)]
-            print(f'Cluster {cl_name} ({cl_color}): {cl_size: >4} cells ' \
-                f'({cl_size / self.cells.size * 100: >2.0f}%)')
+            print(
+                f'Cluster {cl_name} ({cl_color}): {cl_size: >4} cells '
+                f'({cl_size / self.cells.size * 100: >2.0f}%)'
+            )
 
             VAF_cl = self.VAF[self.assignment == cl_id]
             VAF_cl_called = (VAF_cl >= EPSILON).sum(axis=0)
@@ -651,18 +706,33 @@ def main(args):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input', type=str, nargs='+',
-        help='Input _variants.csv file(s).')
-    parser.add_argument('-o', '--output', type=str, default='',
-        help='Output base name: <DIR>/<> .')
-    parser.add_argument('-n', '--clusters', type=int, default=1,
-        help='Number of clusters to define. Default = 1.')
+    parser.add_argument(
+        '-i', '--input', type=str, nargs='+', help='Input _variants.csv file(s).'
+    )
+    parser.add_argument(
+        '-o', '--output', type=str, default='', help='Output base name: <DIR>/<> .'
+    )
+    parser.add_argument(
+        '-n',
+        '--clusters',
+        type=int,
+        default=1,
+        help='Number of clusters to define. Default = 1.',
+    )
 
     plotting = parser.add_argument_group('plotting')
-    plotting.add_argument('-op', '--output_plot', action='store_true',
-        help='Output file for heatmap with dendrogram to "<INPUT>.hm.png".')
-    plotting.add_argument('-sp', '--show_plot', action='store_true',
-        help='Show heatmap with dendrogram at stdout.')
+    plotting.add_argument(
+        '-op',
+        '--output_plot',
+        action='store_true',
+        help='Output file for heatmap with dendrogram to "<INPUT>.hm.png".',
+    )
+    plotting.add_argument(
+        '-sp',
+        '--show_plot',
+        action='store_true',
+        help='Show heatmap with dendrogram at stdout.',
+    )
 
     return parser.parse_args()
 

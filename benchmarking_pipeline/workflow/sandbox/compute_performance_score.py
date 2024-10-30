@@ -6,7 +6,12 @@ import pandas as pd
 from sklearn.metrics import v_measure_score
 
 
-logging.basicConfig(format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M",level=logging.INFO)
+logging.basicConfig(
+    format='{asctime} - {levelname} - {message}',
+    style='{',
+    datefmt='%Y-%m-%d %H:%M',
+    level=logging.INFO,
+)
 
 
 def compute_score(labels, estimate):
@@ -18,10 +23,8 @@ def compute_score(labels, estimate):
         for key2, sample_assignment in assignments:
             if sample_assignment != labels[str(key1)][str(key2)]:
                 mismatches += 1
-            
+
     return mismatches / total_counts
-
-
 
 
 def load_data(path):
@@ -32,7 +35,7 @@ def load_data(path):
 
     with open(path / 'sample_assignment.yaml', 'r') as file:
         sample_assignment = yaml.safe_load(file)
-    
+
     return sample_identity, sample_assignment
 
 
@@ -47,7 +50,9 @@ def preprocess_labels(sample_identity):
             value_dict[sub_key] = int(value)
 
         if len(values) != len(set(values)):
-            logging.error(f"Duplicate values found in sample_identity for key {key}: {values}")
+            logging.error(
+                f'Duplicate values found in sample_identity for key {key}: {values}'
+            )
             pathological_sample_identity = True
     return pathological_sample_identity, sample_identity
 
@@ -60,9 +65,11 @@ def preprocess_sample_assignment(sample_assignment):
 
 def process_simulation_run(path):
     sample_identity, sample_assignment = load_data(path)
-    sample_identity_is_pathological, sample_identity = preprocess_labels(sample_identity)
+    sample_identity_is_pathological, sample_identity = preprocess_labels(
+        sample_identity
+    )
     preprocess_sample_assignment(sample_assignment)
-    
+
     logging.debug(sample_identity_is_pathological)
     logging.debug(sample_assignment)
     logging.debug(sample_identity)
@@ -72,17 +79,22 @@ def process_simulation_run(path):
     return sample_identity_is_pathological, score
 
 
-
 def compute_clustering_performance_score(subfolder):
     demultiplexed_folder = subfolder / 'demultiplexed'
 
     v_measures = []
     for assignment_file in demultiplexed_folder.glob('*assignments.tsv'):
         df = pd.read_csv(assignment_file, sep='\t')
-        
+
         # Extract ground truth labels and cluster assignments
 
-        ground_truth_labels = df.columns[1:].map(lambda col: 'doublet' if '+' in col else col.split('_')[1].split('-')[1]).tolist()
+        ground_truth_labels = (
+            df.columns[1:]
+            .map(
+                lambda col: 'doublet' if '+' in col else col.split('_')[1].split('-')[1]
+            )
+            .tolist()
+        )
         cluster_assignments = df.iloc[0, 1:].tolist()
 
         # Compute ARI
@@ -100,31 +112,46 @@ def main(input_dir):
             for subfolder in subfolder_0.glob('*0'):
                 sample_identity_path = subfolder / 'sample_identity.yaml'
                 sample_assignment_path = subfolder / 'sample_assignment.yaml'
-                
+
                 if sample_identity_path.exists() and sample_assignment_path.exists():
-                    sample_identity_is_pathological, score = process_simulation_run(subfolder)
+                    sample_identity_is_pathological, score = process_simulation_run(
+                        subfolder
+                    )
 
                     mean_v_score = compute_clustering_performance_score(subfolder)
 
                     seed_number = int(seed_folder.name.split('_')[1])
-                    
-                    results.append({
-                        'seed': seed_number,
-                        'doublet_rate': float(subfolder_0.name),
-                        'cell_count': int(subfolder.name),
-                        'score': score,
-                        'sample_identity_is_pathological': sample_identity_is_pathological,
-                        'v_score': mean_v_score
-                    })
+
+                    results.append(
+                        {
+                            'seed': seed_number,
+                            'doublet_rate': float(subfolder_0.name),
+                            'cell_count': int(subfolder.name),
+                            'score': score,
+                            'sample_identity_is_pathological': sample_identity_is_pathological,
+                            'v_score': mean_v_score,
+                        }
+                    )
 
                     # Periodically save results to a file to avoid memory burden
                     if len(results) % 100 == 0:
                         temp_df = pd.DataFrame(results)
-                        temp_df.to_csv('more_intermediate_results.csv', mode='a', header=False, index=False)
+                        temp_df.to_csv(
+                            'more_intermediate_results.csv',
+                            mode='a',
+                            header=False,
+                            index=False,
+                        )
                         results.clear()
     if results:
         df = pd.DataFrame(results)
-        df.to_csv('more_intermediate_results.csv', mode='a', header=not Path('more_intermediate_results.csv').exists(), index=False)
+        df.to_csv(
+            'more_intermediate_results.csv',
+            mode='a',
+            header=not Path('more_intermediate_results.csv').exists(),
+            index=False,
+        )
+
 
 """ def main(input_dir):
     if not isinstance(input_dir, Path):
@@ -168,7 +195,9 @@ def main(input_dir):
  """
 
 if __name__ == '__main__':
-    input_dir = Path('/cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output')# = args.input
-    
-    #process_simulation_run('/cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_4/robust~True/pool_size~4/doublet_rate~0.05/cell_count~1000')
+    input_dir = Path(
+        '/cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output'
+    )  # = args.input
+
+    # process_simulation_run('/cluster/work/bewi/members/jgawron/projects/Demultiplexing/AML_data/output/seed_4/robust~True/pool_size~4/doublet_rate~0.05/cell_count~1000')
     main(input_dir)
