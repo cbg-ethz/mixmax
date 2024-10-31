@@ -5,3 +5,4 @@ slurm*
 *__pycache__
 *config/config_*
 *._*
+*.ipynb*
